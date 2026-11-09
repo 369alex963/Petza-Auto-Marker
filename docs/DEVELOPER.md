@@ -49,4 +49,3 @@ The examples importer reads this format, LabelMe, COCO, and most JSON files that
 
 - Tests: `.venv\Scripts\python -m pytest`. Includes an end-to-end train, mark and score run on synthetic wounds.
 - Frontend: `cd frontend && npm install && npm run build`. The built `frontend/dist` is committed, so the app itself needs no Node.
-- Spec: `superpowers/specs/`. Plan: `superpowers/plans/`.
