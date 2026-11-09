@@ -359,6 +359,9 @@ def holdout():
     return {"items": items}
 
 
+_compare_cache: dict[tuple[str, str], list] = {}
+
+
 def _pool_paths(iid: str) -> tuple[Path, Path]:
     for i, img_path, json_path in dataset.pool_items():
         if i == iid:
@@ -376,7 +379,10 @@ def compare(id: str, max: int = 900):
     img = load_image(img_path)
     truth = read_marking(json_path)
     pred = predictor()
-    regions, _ = pred.predict(img, load_rules(settings().rules_path))
+    key = (str(_predictor["run"]), id)
+    if key not in _compare_cache:  # one prediction serves the thumbnail and the large view
+        _compare_cache[key] = pred.predict(img, load_rules(settings().rules_path))[0]
+    regions = _compare_cache[key]
     scale = min(1.0, max / float(np.max(img.shape[:2])))
     view = cv2.resize(img, None, fx=scale, fy=scale, interpolation=cv2.INTER_AREA) if scale < 1 else img.copy()
     view = np.ascontiguousarray(view[:, :, ::-1])  # RGB -> BGR for cv2

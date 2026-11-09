@@ -1,52 +1,138 @@
-# Petza Auto-Marker
+<div dir="rtl">
 
-A local app that marks wounds on medical photos. Each mark is an outline of points, saved as one JSON file per photo for the other medical app. It learns from Lauren's marked examples and from every photo she corrects. Everything runs on this computer.
+# Petza Auto-Marker 💗
 
-## Start
+היי לורן! זו התוכנה שמסמנת לבד את הפצעים בתמונות.
 
-Double-click `start.bat`. The first time, it installs everything into `.venv` inside this folder, which takes a while once. Then the app opens in the browser at http://127.0.0.1:8765. Keep the black window open while you use it.
+## מה זה?
 
-`setup.bat` installs the right build for the PC: CUDA on NVIDIA cards, DirectML on other graphics cards, CPU otherwise.
+- נותנים לתוכנה תיקייה של תמונות פצעים.
+- התוכנה מציירת קו נקודות מסביב לכל פצע.
+- לכל תמונה נשמר קובץ JSON עם אותו שם, מוכן להכנסה לאפליקציה הרפואית.
+- התוכנה לומדת מהדוגמאות שכבר סימנת, ומכל תיקון שלך היא משתפרת.
+- הכול עובד על המחשב שלך, גם בלי אינטרנט. שום תמונה לא יוצאת מהמחשב.
 
-## Use
-
-1. **Folders:** choose the photo folder, the rules file (`.md` or `.txt`, optional), the folder of marked examples, and optionally an output folder.
-2. **Teach:** press **Import examples**, then **Teach now**. Some photos are kept aside and never learned from. The score is how well the app's outline overlaps Lauren's outline on those photos.
-3. **Photos:** press **Mark all photos**. The smiley shows how sure the app is. "Worth a look" lists the doubtful photos first.
-   The **Hardest test photos** on Teach show Lauren's outline (dark) next to the app's (pink), so you can see where it still struggles. Any earlier model can be switched back on from the history.
-4. **Editor:** drag points, click the outline to add a point, right-click a point to remove it, press `L` to draw a new area with the point lasso. Press **Approve** (the heart) to save. Approved photos are never overwritten, and they teach the app on the next Teach. **Mark this photo** re-runs the app on just the open photo.
-
-## Rules file
-
-Plain text for people. An optional block at the top sets the measurable rules:
-
-```
 ---
-labels: [wound]
-review_below_confidence: 0.75
-min_area_px: 400
-point_spacing_px: 12
-max_regions: 3
+
+## 1. הורדה
+
+1. נכנסים לדף הזה ב-GitHub (צריך להיות מחוברים לחשבון שקיבל גישה).
+2. לוחצים על הכפתור הירוק **Code**, ואז על **Download ZIP**.
+3. לוחצים על קובץ ה-ZIP עם הכפתור הימני, בוחרים **חילוץ הכל** (Extract All), ושמים את התיקייה איפה שנוח, למשל במסמכים.
+
+## 2. התקנה (פעם אחת בלבד)
+
+1. מתקינים את Python מהאתר: https://www.python.org/downloads/
+   - **חשוב:** במסך הראשון של ההתקנה מסמנים את התיבה **Add python.exe to PATH**, ורק אז לוחצים Install.
+2. נכנסים לתיקייה שחילצת ולוחצים פעמיים על **start.bat**.
+3. בפעם הראשונה נפתח חלון שחור שמתקין את כל מה שצריך. זה לוקח בערך 10 עד 20 דקות וצריך אינטרנט. מחכים עד שהוא מסיים.
+
+## 3. הפעלה (כל פעם)
+
+1. לוחצים פעמיים על **start.bat**.
+2. התוכנה נפתחת לבד בדפדפן. אם היא לא נפתחה, נכנסים לכתובת http://127.0.0.1:8765
+3. **לא סוגרים את החלון השחור** כל עוד עובדים. כשמסיימים, סוגרים אותו.
+
 ---
-Trace the outer edge of the wound bed...
-```
 
-When `point_spacing_px` is not set, the app copies the point spacing of the examples.
+## 4. בחירת תיקיות (Folders)
 
-## JSON output
+לוחצים למעלה על **Folders**, ובכל שורה לוחצים **Browse** כדי לבחור:
 
-```json
-{"image": "a.jpg", "width": 4032, "height": 3024,
- "regions": [{"id": "r1", "label": "wound", "points": [[x, y], ...], "confidence": 0.94, "source": "auto"}],
- "model_version": "m-...", "status": "auto | reviewed", "confidence": 0.94}
-```
+- **Photos to mark**: תיקיית התמונות שרוצים לסמן.
+- **Marking rules**: קובץ ההוראות איך לסמן (לא חובה).
+- **Marked examples**: התיקייה של הדוגמאות שכבר סימנת.
+- **Save JSON files to**: איפה לשמור את קבצי ה-JSON. אם משאירים ריק, כל קובץ נשמר ליד התמונה שלו.
 
-Points are pixels in the upright photo (EXIF rotation applied), origin top-left.
+בסוף לוחצים **Save folders**.
 
-The examples importer reads this format, LabelMe, COCO, and most JSON files that hold point lists. A converter for the other app's exact format gets added once a sample file arrives.
+![בחירת תיקיות](docs/screenshots/1-folders.png)
 
-## Developer
+## 5. ללמד את התוכנה (Teach)
 
-- Tests: `.venv\Scripts\python -m pytest`. Includes an end-to-end train, mark and score run on synthetic wounds.
-- Frontend: `cd frontend && npm install && npm run build`. The built `frontend/dist` is committed, so the app itself needs no Node.
-- Spec: `docs/superpowers/specs/`. Plan: `docs/superpowers/plans/`.
+לוחצים למעלה על **Teach**.
+
+1. לוחצים **Import examples**, והתוכנה טוענת את הדוגמאות שסימנת.
+2. לוחצים **Teach now**. הלמידה לוקחת בערך 5 עד 15 דקות. אפשר לראות את ההתקדמות בפס למעלה.
+3. כשהלמידה נגמרת, המספר הגדול הוא הציון: כמה הסימון של התוכנה דומה לסימון שלך, על תמונות שהתוכנה לא ראתה בזמן הלמידה.
+
+התוכנה עוברת למודל החדש רק אם הוא טוב לפחות כמו הקודם. אם רוצים לחזור לגרסה קודמת, לוחצים **Use this one** בטבלה שלמטה.
+
+![מסך הלמידה](docs/screenshots/2-teach.png)
+
+### התמונות הכי קשות
+
+מתחת לציון מופיעות התמונות שבהן התוכנה טעתה הכי הרבה. לוחצים על תמונה כדי לראות אותה בגדול:
+**הקו הכהה** הוא הסימון שלך, ו**הקו הוורוד** הוא הסימון של התוכנה.
+כדאי להוסיף עוד דוגמאות שדומות לתמונות האלה.
+
+![התמונות הכי קשות](docs/screenshots/3-hardest.png)
+
+## 6. לסמן את כל התמונות (Photos)
+
+לוחצים למעלה על **Photos**, ואז על **Mark all photos**. התוכנה מסמנת את כל התיקייה ושומרת JSON לכל תמונה.
+
+- **הסמיילי והאחוז** על כל תמונה מראים כמה התוכנה בטוחה בסימון.
+- **Worth a look**: התמונות שכדאי לבדוק, כי התוכנה פחות בטוחה בהן.
+- **Approved** עם לב: תמונות שאישרת. התוכנה אף פעם לא תדרוס אותן.
+
+לוחצים על תמונה כדי לפתוח אותה לבדיקה ולתיקון.
+
+![כל התמונות](docs/screenshots/4-photos.png)
+
+## 7. לבדוק ולתקן תמונה
+
+- **להזיז נקודה**: גוררים אותה עם העכבר.
+- **להוסיף נקודה**: לוחצים על הקו.
+- **למחוק נקודה**: לחיצה ימנית עליה.
+- **למחוק אזור שלם**: לוחצים על הפח שבצד ימין.
+- **זום**: גלגלת העכבר. **להזיז את התמונה**: מחזיקים רווח וגוררים.
+- **בטעות?** Ctrl+Z מבטל.
+- **Mark this photo again**: מסמן מחדש רק את התמונה הזו.
+
+כשהסימון טוב, לוחצים **Approve and next** (הלב). התמונה נשמרת כמאושרת, ועוברים לתמונה הבאה.
+כל תמונה שאישרת מלמדת את התוכנה בפעם הבאה שלוחצים **Teach now**.
+
+![בדיקה ותיקון](docs/screenshots/5-editor.png)
+
+### לצייר אזור חדש (לאסו)
+
+אם התוכנה פספסה פצע:
+
+1. לוחצים על **Draw another area**, או על המקש **L**.
+2. לוחצים נקודה אחרי נקודה מסביב לפצע.
+3. כדי לסגור את הקו, לוחצים על הנקודה הראשונה, לוחצים לחיצה כפולה, או לוחצים Enter.
+
+![ציור אזור חדש](docs/screenshots/6-lasso.png)
+
+## 8. הגדרות (Settings), לא חובה
+
+אפשר לחבר בינה מלאכותית חיצונית (Claude) שנותנת "דעה שנייה" ומסמנת תמונות שכדאי לבדוק. היא לא מזיזה נקודות.
+כדי להפעיל: מדביקים מפתח API, מסמנים את התיבה, ולוחצים **Save settings**.
+בלי זה הכול עובד רגיל ובלי אינטרנט.
+
+![הגדרות](docs/screenshots/7-settings.png)
+
+---
+
+## הסדר שמומלץ לעבוד בו
+
+1. **Folders**: בוחרים תיקיות.
+2. **Teach**: לוחצים Import examples ואז Teach now.
+3. **Photos**: לוחצים Mark all photos.
+4. בודקים את התמונות שב-**Worth a look**, מתקנים ומאשרים עם הלב.
+5. מדי פעם לוחצים שוב **Teach now**, והתוכנה משתפרת מהתיקונים שלך.
+
+## משהו לא עובד?
+
+- **החלון השחור נסגר מיד**: בודקים ש-Python מותקן ושסימנת את Add to PATH, ומפעילים שוב.
+- **הדף לא נפתח**: בודקים שהחלון השחור פתוח, ונכנסים ל-http://127.0.0.1:8765
+- **כפתור Teach now אפור**: צריך לבחור קודם תיקיית דוגמאות וללחוץ Import examples. צריך לפחות 3 דוגמאות.
+
+💗
+
+</div>
+
+---
+
+Developer notes: [docs/DEVELOPER.md](docs/DEVELOPER.md)
