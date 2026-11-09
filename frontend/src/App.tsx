@@ -1,0 +1,220 @@
+import { useCallback, useEffect, useRef, useState } from "react";
+import { api, type Job, type Status } from "./api";
+import { Heart, Stop } from "./icons";
+import { Editor } from "./screens/Editor";
+import { Mark } from "./screens/Mark";
+import { Settings } from "./screens/Settings";
+import { Setup } from "./screens/Setup";
+import { Teach } from "./screens/Teach";
+
+export type Route = { name: "mark" | "teach" | "setup" | "settings" | "edit"; path?: string };
+
+function parseHash(): Route {
+  const h = window.location.hash.replace(/^#\/?/, "");
+  const [name, query] = h.split("?");
+  const params = new URLSearchParams(query ?? "");
+  if (name === "edit") return { name: "edit", path: params.get("path") ?? undefined };
+  if (name === "teach" || name === "setup" || name === "settings") return { name };
+  return { name: "mark" };
+}
+
+export const go = (hash: string) => {
+  window.location.hash = hash;
+};
+export const editHash = (path: string) => `#/edit?path=${encodeURIComponent(path)}`;
+
+export interface AppCtx {
+  status: Status | null;
+  statusError: string | null;
+  refresh: () => Promise<void>;
+  job: Job | null;
+  startJob: (kind: "import" | "train" | "mark" | "review", body?: unknown) => Promise<void>;
+  jobVersion: number;
+  toast: (msg: string) => void;
+}
+
+const TABS: { name: Route["name"]; label: string }[] = [
+  { name: "mark", label: "Photos" },
+  { name: "teach", label: "Teach" },
+  { name: "setup", label: "Folders" },
+  { name: "settings", label: "Settings" },
+];
+
+const JOB_LABEL: Record<string, string> = { import: "Importing examples", train: "Teaching", mark: "Marking photos", review: "AI second opinion" };
+
+export function App() {
+  const [route, setRoute] = useState<Route>(parseHash);
+  const [status, setStatus] = useState<Status | null>(null);
+  const [statusError, setStatusError] = useState<string | null>(null);
+  const [job, setJob] = useState<Job | null>(null);
+  const [jobVersion, setJobVersion] = useState(0);
+  const [toastMsg, setToastMsg] = useState<string | null>(null);
+  const lastStatus = useRef<string>("idle");
+
+  useEffect(() => {
+    const on = () => setRoute(parseHash());
+    window.addEventListener("hashchange", on);
+    return () => window.removeEventListener("hashchange", on);
+  }, []);
+
+  const refresh = useCallback(async () => {
+    try {
+      const s = await api.status();
+      setStatus(s);
+      setJob(s.job);
+      setStatusError(null);
+    } catch (e) {
+      setStatusError((e as Error).message);
+    }
+  }, []);
+
+  useEffect(() => {
+    void refresh();
+  }, [refresh]);
+
+  // Poll the job while one runs; when it finishes, everything refreshes once.
+  useEffect(() => {
+    const running = job?.status === "running";
+    const t = window.setInterval(
+      async () => {
+        try {
+          const j = await api.job();
+          setJob(j);
+          if (lastStatus.current === "running" && j.status !== "running") {
+            setJobVersion((v) => v + 1);
+            void refresh();
+          }
+          lastStatus.current = j.status;
+        } catch {
+          /* server restarting */
+        }
+      },
+      running ? 600 : 4000,
+    );
+    return () => window.clearInterval(t);
+  }, [job?.status, refresh]);
+
+  const toast = useCallback((msg: string) => {
+    setToastMsg(msg);
+    window.setTimeout(() => setToastMsg(null), 2600);
+  }, []);
+
+  const startJob = useCallback(
+    async (kind: "import" | "train" | "mark" | "review", body?: unknown) => {
+      try {
+        const j = await api.start(kind, body);
+        lastStatus.current = "running";
+        setJob(j);
+      } catch (e) {
+        toast((e as Error).message);
+      }
+    },
+    [toast],
+  );
+
+  const ctx: AppCtx = { status, statusError, refresh, job, startJob, jobVersion, toast };
+  const current = route.name === "edit" ? "mark" : route.name;
+
+  return (
+    <>
+      <header className="bar">
+        <div className="bar__in">
+          <a className="wordmark" href="#/mark" aria-label="Petza Auto-Marker, photos">
+            <span className="wordmark__heart">
+              <Heart size={22} />
+            </span>
+            Petza Auto-Marker
+            <span className="wordmark__for">for Lauren</span>
+          </a>
+          <nav className="tabs" aria-label="Main">
+            {TABS.map((t) => (
+              <a key={t.name} className="tab" href={`#/${t.name}`} aria-current={current === t.name ? "page" : undefined}>
+                {t.label}
+              </a>
+            ))}
+          </nav>
+        </div>
+      </header>
+      <JobStrip job={job} />
+      {statusError && !status ? (
+        <main className="page">
+          <div className="note note--error" role="alert">
+            <p>The app's engine is not answering ({statusError}). Is the black start window still open? Start it again with start.bat.</p>
+            <button type="button" className="btn" onClick={() => void refresh()}>
+              Try again
+            </button>
+          </div>
+        </main>
+      ) : route.name === "edit" && route.path ? (
+        <Editor key={route.path} path={route.path} ctx={ctx} />
+      ) : route.name === "teach" ? (
+        <Teach ctx={ctx} />
+      ) : route.name === "setup" ? (
+        <Setup ctx={ctx} />
+      ) : route.name === "settings" ? (
+        <Settings ctx={ctx} />
+      ) : (
+        <Mark ctx={ctx} />
+      )}
+      {toastMsg ? (
+        <div className="toast" role="status">
+          <span className="toast__heart">
+            <Heart size={16} />
+          </span>
+          {toastMsg}
+        </div>
+      ) : null}
+    </>
+  );
+}
+
+function JobStrip({ job }: { job: Job | null }) {
+  const [hideDone, setHideDone] = useState(false);
+  useEffect(() => setHideDone(false), [job?.status, job?.kind]);
+  if (!job || job.status === "idle" || hideDone) return null;
+  const label = JOB_LABEL[job.kind ?? ""] ?? "Working";
+  const pct = Math.round(job.progress * 100);
+  if (job.status === "running") {
+    return (
+      <div className="job" role="status" aria-live="polite">
+        <div className="job__in">
+          <span className="job__msg">
+            {label}: {job.message}
+          </span>
+          <div className="job__track" aria-hidden="true">
+            <div className="job__fill" style={{ transform: `scaleX(${job.progress})` }} />
+          </div>
+          <span className="job__pct">{pct}%</span>
+          <button type="button" className="btn btn--small" onClick={() => void api.cancel()}>
+            <Stop /> Stop
+          </button>
+        </div>
+      </div>
+    );
+  }
+  const text =
+    job.status === "error" ? `${label} stopped with a problem: ${job.error}` : job.status === "stopped" ? `${label} was stopped.` : `${label} finished. ${summarize(job)}`;
+  return (
+    <div className={`job ${job.status === "error" ? "job--error" : "job--done"}`} role="status">
+      <div className="job__in">
+        <span className="job__msg">{text}</span>
+        <button type="button" className="btn btn--small btn--quiet" onClick={() => setHideDone(true)}>
+          Close
+        </button>
+      </div>
+    </div>
+  );
+}
+
+function summarize(job: Job): string {
+  const r = job.result as Record<string, unknown> | null;
+  if (!r) return "";
+  if (job.kind === "import") return `${r.imported} of ${r.total} examples imported${(r.no_marking as unknown[])?.length ? `, ${(r.no_marking as unknown[]).length} had no marking file` : ""}.`;
+  if (job.kind === "mark") return `${r.marked} marked, ${r.needs_review} worth a look, ${r.skipped_reviewed} already approved.`;
+  if (job.kind === "train") {
+    const iou = r.iou as number | null;
+    return iou == null ? "" : `Accuracy ${(iou * 100).toFixed(1)}%. ${r.promoted ? "The new model is live." : "The previous model scored better and stays."}`;
+  }
+  if (job.kind === "review") return `${r.reviewed} checked, ${r.flagged} flagged.`;
+  return "";
+}

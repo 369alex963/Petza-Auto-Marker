@@ -2,9 +2,8 @@ __pycache__/
 *.pyc
 .venv/
 node_modules/
-frontend/dist/
 data/
-*.onnx
-*.pt
+models/
 .env*
 .pytest_cache/
+*.tsbuildinfo

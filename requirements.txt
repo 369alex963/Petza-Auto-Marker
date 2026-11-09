@@ -1,0 +1,13 @@
+segmentation-models-pytorch>=0.6
+albumentations>=2.0
+opencv-python-headless>=4.10
+onnx>=1.17
+fastapi>=0.115
+uvicorn[standard]>=0.30
+pydantic>=2.8
+pillow>=11
+numpy>=1.26
+pyyaml>=6
+httpx>=0.27
+anthropic>=0.70
+pytest>=8
