@@ -12,12 +12,11 @@ from fastapi.responses import FileResponse, JSONResponse, Response
 from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel
 
-from . import config, dataset, reviewer, train
+from . import config, dataset, prompts, reviewer, train
 from .batch import mark_folder
 from .device import device_info
 from .imageio import list_images, load_image, open_image
 from .jobs import Busy, JobRunner
-from .rules import load_rules
 from .schema import Marking, marking_path_for, read_marking, write_marking
 
 app = FastAPI(title="Wound-Recognizer")
@@ -25,7 +24,6 @@ app = FastAPI(title="Wound-Recognizer")
 from fastapi.middleware.trustedhost import TrustedHostMiddleware  # noqa: E402
 
 app.add_middleware(TrustedHostMiddleware, allowed_hosts=["127.0.0.1", "localhost", "testserver"])
-RULES_EXTS = {".md", ".txt", ".markdown"}
 
 # Load torch and probe the hardware right away, so the first page load is quick.
 threading.Thread(target=device_info, daemon=True, name="warmup").start()
@@ -80,19 +78,18 @@ def status():
         model = {"run_id": meta["run_id"], "created_at": meta["created_at"], "classes": meta["classes"],
                  "iou": score.get("iou"), "dice": score.get("dice"), "boundary_f": score.get("boundary_f"),
                  "train_count": meta.get("train_count"), "device": meta.get("device")}
-    rules = load_rules(s.rules_path)
+    rules = prompts.active_rules()
     public = s.model_dump()
     public["anthropic_api_key"] = bool(s.anthropic_api_key)
     public["openai_api_key"] = bool(s.openai_api_key)
     return {"device": device_info(), "model": model, "pool": dataset.pool_stats(), "settings": public,
-            "rules": {"loaded": bool(s.rules_path and Path(s.rules_path).is_file()), "labels": rules.labels,
-                      "text": rules.text, "review_below_confidence": rules.review_below_confidence},
+            "rules": {"prompt": prompts.load()["active"], "labels": rules.labels,
+                      "review_below_confidence": rules.review_below_confidence},
             "reviewer": reviewer.connections(s), "job": jobs.snapshot()}
 
 
 class SettingsIn(BaseModel):
     images_dir: str | None = None
-    rules_path: str | None = None
     examples_dir: str | None = None
     output_dir: str | None = None
     anthropic_api_key: str | None = None
@@ -116,10 +113,6 @@ def update_settings(body: SettingsIn):
                 Path(data[k]).mkdir(parents=True, exist_ok=True)
             else:
                 raise HTTPException(400, f"Folder not found: {data[k]}")
-    if data["rules_path"] and not Path(data["rules_path"]).is_file():
-        raise HTTPException(400, f"Rules file not found: {data['rules_path']}")
-    if data["rules_path"] and Path(data["rules_path"]).suffix.lower() not in RULES_EXTS:
-        raise HTTPException(400, "The rules file must be a .md, .markdown or .txt file.")
     if data["reviewer_provider"] not in reviewer.PROVIDERS:
         raise HTTPException(400, "Unknown AI provider.")
     config.save_settings(config.Settings(**data))
@@ -179,7 +172,7 @@ def images():
     if not s.images_dir:
         return {"items": []}
     out = output_dir(s)
-    threshold = load_rules(s.rules_path).review_below_confidence
+    threshold = prompts.active_rules().review_below_confidence
     return {"items": [_summary(p, out, threshold) for p in list_images(s.images_dir, skip=out)]}
 
 
@@ -267,7 +260,7 @@ def job_mark(body: MarkIn | None = None):
     if not s.images_dir:
         raise HTTPException(400, "Choose the images folder first.")
     pred = predictor()
-    rules = load_rules(s.rules_path)
+    rules = prompts.active_rules()
     only = [str(check_path(p)) for p in body.only] if body and body.only else None
 
     def run(progress, stop):
@@ -308,8 +301,52 @@ def job_review():
     s = settings()
     if not reviewer.connections(s)["ready"]:
         raise HTTPException(400, "Connect an AI account or add an API key in Settings first.")
-    rules = load_rules(s.rules_path)
+    rules = prompts.active_rules()
     return _start("review", lambda progress, stop: _review_all(s, rules, progress, stop))
+
+
+# ---------- marking prompts (what the online AI reads) ----------
+
+class PromptIn(BaseModel):
+    name: str
+    text: str
+
+
+def _prompts_out(store: dict) -> dict:
+    return {**store, "default_name": prompts.DEFAULT_NAME, "default_text": prompts.DEFAULT_TEXT}
+
+
+@app.get("/api/prompts")
+def get_prompts():
+    return _prompts_out(prompts.load())
+
+
+@app.put("/api/prompts")
+def put_prompt(body: PromptIn):
+    name = body.name.strip()
+    if not name or len(name) > 80:
+        raise HTTPException(400, "Give the prompt a name (up to 80 characters).")
+    return _prompts_out(prompts.put(name, body.text))
+
+
+class NameIn(BaseModel):
+    name: str
+
+
+@app.post("/api/prompts/select")
+def select_prompt(body: NameIn):
+    try:
+        return _prompts_out(prompts.select(body.name))
+    except KeyError:
+        raise HTTPException(404, "No prompt with that name.")
+
+
+@app.post("/api/prompts/delete")
+def delete_prompt(body: NameIn):
+    try:
+        return _prompts_out(prompts.delete(body.name))
+    except ValueError as e:
+        raise HTTPException(400, str(e))
 
 
 @app.post("/api/reviewer/test")
@@ -381,7 +418,7 @@ def _pool_paths(iid: str) -> tuple[Path, Path]:
 
 @app.get("/api/compare")
 def compare(id: str, max: int = 900):
-    """A held-out photo with Lauren's outline (dark) and the app's outline (pink)."""
+    """A held-out photo with the human outline (dark) and the app's outline (pink)."""
     import cv2
     import numpy as np
 
@@ -391,7 +428,7 @@ def compare(id: str, max: int = 900):
     pred = predictor()
     key = (str(_predictor["run"]), id)
     if key not in _compare_cache:  # one prediction serves the thumbnail and the large view
-        _compare_cache[key] = pred.predict(img, load_rules(settings().rules_path))[0]
+        _compare_cache[key] = pred.predict(img, prompts.active_rules())[0]
     regions = _compare_cache[key]
     scale = min(1.0, max / float(np.max(img.shape[:2])))
     view = cv2.resize(img, None, fx=scale, fy=scale, interpolation=cv2.INTER_AREA) if scale < 1 else img.copy()

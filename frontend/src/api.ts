@@ -11,6 +11,13 @@ export interface Region {
 export type Provider = "claude" | "openai";
 export type Connection = "account" | "api";
 
+export interface Prompts {
+  active: string;
+  prompts: Record<string, string>;
+  default_name: string;
+  default_text: string;
+}
+
 export interface Review {
   ok: boolean;
   problems: string[];
@@ -71,8 +78,8 @@ export interface Status {
     openai_api_key: boolean;
     openai_model: string;
   };
-  reviewer: { claude: Connection[]; openai: Connection[]; ready: boolean };
-  rules: { loaded: boolean; labels: string[]; text: string; review_below_confidence: number };
+  reviewer: { claude: Connection[]; openai: Connection[]; ready: boolean; install: { claude: string; codex: string } };
+  rules: { prompt: string; labels: string[]; review_below_confidence: number };
   job: Job;
 }
 
@@ -145,6 +152,10 @@ export const api = {
   job: () => call<Job>("GET", "/api/jobs/current"),
   start: (kind: "import" | "train" | "mark" | "review", body?: unknown) => call<Job>("POST", `/api/jobs/${kind}`, body),
   cancel: () => call<Job>("POST", "/api/jobs/cancel"),
+  prompts: () => call<Prompts>("GET", "/api/prompts"),
+  putPrompt: (name: string, text: string) => call<Prompts>("PUT", "/api/prompts", { name, text }),
+  selectPrompt: (name: string) => call<Prompts>("POST", "/api/prompts/select", { name }),
+  deletePrompt: (name: string) => call<Prompts>("POST", "/api/prompts/delete", { name }),
   testReviewer: () => call<{ ok: boolean; via: string | null; errors: string[] }>("POST", "/api/reviewer/test"),
   runs: () => call<{ runs: Run[] }>("GET", "/api/runs"),
   useRun: (runId: string) => call<Status>("POST", `/api/runs/${encodeURIComponent(runId)}/use`),

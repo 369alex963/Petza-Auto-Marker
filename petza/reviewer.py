@@ -11,11 +11,11 @@ from __future__ import annotations
 
 import base64
 import json
+import os
 import shutil
 import subprocess
 import sys
 import tempfile
-from functools import lru_cache
 from pathlib import Path
 
 import cv2
@@ -40,7 +40,8 @@ Marking rules from the clinician:
 Check the marking against the rules and the photo. Report a problem only when you can see it, for example:
 the outline cuts into the wound or leaves part of it out, it includes healthy skin, a wound is missed,
 something that is not a wound is marked, or the label is wrong.
-Set ok to true when the marking is acceptable as is."""
+Set ok to true when the marking is acceptable as is.
+Write problems and summary in the language the clinician's rules are written in."""
 
 FILE_NOTE = "\n\nThe photo with the marking is the file {name} in the current folder. Open it and look at it before you answer."
 
@@ -72,9 +73,35 @@ def overlay(img: np.ndarray, marking: Marking) -> bytes:
 
 # ---------- connections ----------
 
-@lru_cache(maxsize=None)
+INSTALL = {  # official pages, shown in Settings when the app is missing
+    "claude": "https://code.claude.com/docs/en/setup",
+    "codex": "https://openai.com/codex/",
+}
+
+
+def _newest(paths) -> list[Path]:
+    return sorted((p for p in paths if p.is_file()), key=lambda p: p.stat().st_mtime, reverse=True)
+
+
 def _cli(name: str) -> str | None:
-    return shutil.which(name)
+    """The signed-in AI app's command line, wherever its installer put it on this PC."""
+    found = shutil.which(name)
+    if found:
+        return found
+    home = Path.home()
+    local = Path(os.environ.get("LOCALAPPDATA", home / "AppData" / "Local"))
+    roaming = Path(os.environ.get("APPDATA", home / "AppData" / "Roaming"))
+    exe = f"{name}.exe"
+    spots = [home / ".local" / "bin" / exe, local / "Microsoft" / "WinGet" / "Links" / exe,
+             roaming / "npm" / f"{name}.cmd", local / "Programs" / name / exe]
+    if name == "claude":  # native installer, or the copy inside the VS Code / Cursor extension
+        for ide in (".vscode", ".vscode-insiders", ".cursor", ".windsurf"):
+            spots += _newest((home / ide / "extensions").glob("anthropic.claude-code-*/resources/native-binary/claude.exe"))
+    else:  # the ChatGPT / Codex desktop app keeps codex.exe in a versioned folder
+        spots += _newest((local / "OpenAI" / "Codex" / "bin").glob("*/codex.exe"))
+        for ide in (".vscode", ".vscode-insiders", ".cursor", ".windsurf"):
+            spots += _newest((home / ide / "extensions").glob("openai.chatgpt-*/bin/*/codex.exe"))
+    return next((str(p) for p in spots if p.is_file()), None)
 
 
 def connections(s) -> dict:
@@ -82,7 +109,7 @@ def connections(s) -> dict:
     claude = [m for m, ok in (("account", _cli("claude")), ("api", s.anthropic_api_key)) if ok]
     openai = [m for m, ok in (("account", _cli("codex")), ("api", s.openai_api_key)) if ok]
     order = claude if s.reviewer_provider == "claude" else openai
-    return {"claude": claude, "openai": openai, "ready": bool(order)}
+    return {"claude": claude, "openai": openai, "ready": bool(order), "install": INSTALL}
 
 
 def _run(cmd: list[str], prompt: str, cwd: str) -> subprocess.CompletedProcess:
@@ -112,7 +139,7 @@ def _openai_account(jpeg: bytes, prompt: str, model: str) -> ReviewResult:
         img.write_bytes(jpeg)
         schema.write_text(json.dumps(SCHEMA), encoding="utf-8")
         cmd = [_cli("codex"), "exec", "--skip-git-repo-check", "--sandbox", "read-only", "--image", str(img),
-               "--output-schema", str(schema), "--output-last-message", str(answer)]
+               "--output-schema", str(schema), "--output-last-message", str(answer), "--ephemeral"]
         if model:
             cmd += ["--model", model]
         r = _run(cmd + ["-"], prompt, d)
@@ -197,6 +224,11 @@ def test(s) -> dict:
     pts = [[160 + 62 * np.cos(a), 160 + 62 * np.sin(a)] for a in t]
     m = Marking(image="test.jpg", width=320, height=320, regions=[Region(id="r1", points=pts)])
     if not connections(s)["ready"]:
-        return {"ok": False, "via": None, "errors": ["Nothing to connect with yet: sign in to the app on this PC, or add an API key."]}
-    result, via, errors = review_verbose(img, m, "Trace the outer edge of the dark round wound.", s)
+        missing = ("ChatGPT: the ChatGPT / Codex app was not found on this computer and no OpenAI API key is saved."
+                   if s.reviewer_provider == "openai" else
+                   "Claude: the Claude Code app was not found on this computer and no Anthropic API key is saved.")
+        return {"ok": False, "via": None, "errors": [missing]}
+    from . import prompts
+
+    result, via, errors = review_verbose(img, m, prompts.active_rules().text, s)
     return {"ok": result is not None, "via": via, "errors": errors}

@@ -1,4 +1,4 @@
-"""The training pool: imported examples plus Lauren's reviewed corrections.
+"""The training pool: imported examples plus the reviewed corrections.
 
 Layout (inside data/pool):
     <id>.<ext>   copy of the original image file

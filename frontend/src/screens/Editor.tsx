@@ -481,7 +481,7 @@ export function Editor({ path, ctx }: { path: string; ctx: AppCtx }) {
 
         {marking?.status === "reviewed" ? (
           <div className="mood mood--happy">
-            <Heart size={20} /> Approved by Lauren
+            <Heart size={20} /> Approved
           </div>
         ) : marking && marking.model_version ? (
           <div className={`mood ${mood}`}>

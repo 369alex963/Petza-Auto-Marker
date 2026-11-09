@@ -38,7 +38,7 @@ export function Mark({ ctx }: { ctx: AppCtx }) {
   const shown = (items ?? []).filter((i) =>
     filter === "all" ? true : filter === "approved" ? i.status === "reviewed" : filter === "unmarked" ? !i.status || i.status === "foreign" : i.needs_review,
   );
-  // Worried ones first: that is where Lauren's eye is needed.
+  // Worried ones first: that is where a human eye is needed.
   const ordered = filter === "look" ? [...shown].sort((a, b) => (a.confidence ?? 0) - (b.confidence ?? 0)) : shown;
 
   const setF = (f: Filter) => {
@@ -77,7 +77,7 @@ export function Mark({ ctx }: { ctx: AppCtx }) {
 
       {noModel ? (
         <div className="note">
-          <p>Before marking, the app has to learn from Lauren's marked examples. Import them and press Teach; it takes a few minutes.</p>
+          <p>Before marking, the app has to learn from your marked examples. Import them and press Teach; it takes a few minutes.</p>
           <a className="btn" href="#/teach">
             Go to Teach
           </a>

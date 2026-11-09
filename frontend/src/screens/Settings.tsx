@@ -3,8 +3,8 @@ import type { AppCtx } from "../App";
 import { api, type Provider } from "../api";
 
 const ACCOUNT_APP: Record<Provider, { app: string; signin: string }> = {
-  claude: { app: "Claude Code", signin: "Install Claude Code and sign in with the Claude account once." },
-  openai: { app: "Codex", signin: "Install the OpenAI Codex app and sign in with the ChatGPT account once (codex login)." },
+  claude: { app: "Claude Code", signin: "Install Claude Code and sign in with your Claude account once." },
+  openai: { app: "the ChatGPT Codex app", signin: "Install the Codex app and sign in with your ChatGPT account once." },
 };
 
 type TestResult = { ok: boolean; via: string | null; errors: string[] };
@@ -99,7 +99,7 @@ export function Settings({ ctx }: { ctx: AppCtx }) {
           <h2 className="panel__title">AI second opinion</h2>
           <label className="switch">
             <input type="checkbox" checked={enabled} onChange={(e) => setEnabled(e.target.checked)} />
-            Check each new marking after “Mark all”
+            After “Mark all photos”, also ask the AI to look at every new marking and flag the ones that may be wrong (about 20 seconds per photo)
           </label>
 
           <fieldset className="field">
@@ -119,9 +119,15 @@ export function Settings({ ctx }: { ctx: AppCtx }) {
           <div className="field">
             <span className="field__label">Account on this computer</span>
             {hasAccount ? (
-              <span>The {ACCOUNT_APP[provider].app} app is installed. Its signed-in account is used first, no key needed.</span>
+              <span>{provider === "claude" ? "Claude Code" : "The Codex app"} is installed. Its signed-in account is used first, no key needed.</span>
             ) : (
-              <span className="muted">Not found. {ACCOUNT_APP[provider].signin} Or add an API key below.</span>
+              <span className="muted">
+                Not found on this computer. {ACCOUNT_APP[provider].signin}{" "}
+                <a href={provider === "claude" ? s?.reviewer.install.claude : s?.reviewer.install.codex} target="_blank" rel="noreferrer">
+                  Download {ACCOUNT_APP[provider].app} from the official site
+                </a>
+                , sign in, then press Test connection. Or add an API key below.
+              </span>
             )}
           </div>
 
