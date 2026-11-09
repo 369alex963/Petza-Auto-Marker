@@ -53,7 +53,7 @@ export function Settings({ ctx }: { ctx: AppCtx }) {
           <h2 className="panel__title">AI second opinion</h2>
           <label className="switch">
             <input type="checkbox" checked={enabled} onChange={(e) => setEnabled(e.target.checked)} />
-            Check each new marking with Claude after "Mark all"
+            Check each new marking with Claude after “Mark all”
           </label>
           <div className="field">
             <label className="field__label" htmlFor="key">

@@ -9,6 +9,15 @@ type Drag = { kind: "vertex"; region: number; index: number } | { kind: "pan"; s
 
 const round1 = (n: number) => Math.round(n * 10) / 10;
 
+/** Keep receiving moves while dragging, even outside the element. Never fatal. */
+const capture = (e: React.PointerEvent) => {
+  try {
+    (e.target as Element).setPointerCapture(e.pointerId);
+  } catch {
+    /* pointer already released */
+  }
+};
+
 export function Editor({ path, ctx }: { path: string; ctx: AppCtx }) {
   const [marking, setMarking] = useState<Marking | null>(null);
   const [error, setError] = useState<string | null>(null);
@@ -85,23 +94,21 @@ export function Editor({ path, ctx }: { path: string; ctx: AppCtx }) {
     [regions],
   );
   const undo = useCallback(() => {
-    setPast((p) => {
-      if (!p.length) return p;
-      setFuture((f) => [regions, ...f]);
-      setRegions(p[p.length - 1]);
-      setDirty(true);
-      return p.slice(0, -1);
-    });
-  }, [regions]);
+    if (!past.length) return;
+    setFuture([regions, ...future]);
+    setRegions(past[past.length - 1]);
+    setPast(past.slice(0, -1));
+    setSelected((s) => (s != null && s < past[past.length - 1].length ? s : null));
+    setDirty(true);
+  }, [past, future, regions]);
   const redo = useCallback(() => {
-    setFuture((f) => {
-      if (!f.length) return f;
-      setPast((p) => [...p, regions]);
-      setRegions(f[0]);
-      setDirty(true);
-      return f.slice(1);
-    });
-  }, [regions]);
+    if (!future.length) return;
+    setPast([...past, regions]);
+    setRegions(future[0]);
+    setFuture(future.slice(1));
+    setSelected((s) => (s != null && s < future[0].length ? s : null));
+    setDirty(true);
+  }, [past, future, regions]);
 
   // ---------- geometry helpers ----------
   const toImage = useCallback((clientX: number, clientY: number): Point => {
@@ -131,7 +138,7 @@ export function Editor({ path, ctx }: { path: string; ctx: AppCtx }) {
 
   const startPan = (e: React.PointerEvent) => {
     if (!view) return;
-    (e.target as Element).setPointerCapture?.(e.pointerId);
+    capture(e);
     setDrag({ kind: "pan", sx: e.clientX, sy: e.clientY, view });
   };
 
@@ -173,7 +180,7 @@ export function Editor({ path, ctx }: { path: string; ctx: AppCtx }) {
       if (tool === "lasso") addDraftPoint(e);
       return;
     }
-    (e.target as Element).setPointerCapture?.(e.pointerId);
+    capture(e);
     dragStartRegions.current = regions;
     setSelected(region);
     setDrag({ kind: "vertex", region, index });
@@ -204,7 +211,7 @@ export function Editor({ path, ctx }: { path: string; ctx: AppCtx }) {
     setRegions(next);
     setDirty(true);
     dragStartRegions.current = null; // the insert is already in history
-    (e.target as Element).setPointerCapture?.(e.pointerId);
+    capture(e);
     setSelected(region);
     setDrag({ kind: "vertex", region, index: index + 1 });
   };
@@ -232,8 +239,9 @@ export function Editor({ path, ctx }: { path: string; ctx: AppCtx }) {
   };
 
   const onUp = () => {
-    if (drag?.kind === "vertex" && dragStartRegions.current) {
-      setPast((h) => [...h.slice(-99), dragStartRegions.current!]);
+    const before = dragStartRegions.current;
+    if (drag?.kind === "vertex" && before && before !== regions) {
+      setPast((h) => [...h.slice(-99), before]);
       setFuture([]);
       setDirty(true);
     }

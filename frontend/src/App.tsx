@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useRef, useState } from "react";
+import { Component, useCallback, useEffect, useRef, useState, type ReactNode } from "react";
 import { api, type Job, type Status } from "./api";
 import { Heart, Stop } from "./icons";
 import { Editor } from "./screens/Editor";
@@ -145,7 +145,9 @@ export function App() {
             </button>
           </div>
         </main>
-      ) : route.name === "edit" && route.path ? (
+      ) : (
+        <Guard resetKey={window.location.hash}>
+          {route.name === "edit" && route.path ? (
         <Editor key={route.path} path={route.path} ctx={ctx} />
       ) : route.name === "teach" ? (
         <Teach ctx={ctx} />
@@ -155,6 +157,8 @@ export function App() {
         <Settings ctx={ctx} />
       ) : (
         <Mark ctx={ctx} />
+          )}
+        </Guard>
       )}
       {toastMsg ? (
         <div className="toast" role="status">
@@ -166,6 +170,30 @@ export function App() {
       ) : null}
     </>
   );
+}
+
+/** A screen that fails shows a way back instead of a blank page. Saved files are untouched. */
+class Guard extends Component<{ children: ReactNode; resetKey: string }, { error: string | null; key: string }> {
+  state = { error: null as string | null, key: this.props.resetKey };
+  static getDerivedStateFromError(e: Error) {
+    return { error: e.message };
+  }
+  static getDerivedStateFromProps(p: { resetKey: string }, s: { key: string }) {
+    return p.resetKey !== s.key ? { error: null, key: p.resetKey } : null;
+  }
+  render() {
+    if (!this.state.error) return this.props.children;
+    return (
+      <main className="page">
+        <div className="note note--error" role="alert">
+          <p>This screen ran into a problem ({this.state.error}). Nothing saved was lost.</p>
+          <button type="button" className="btn" onClick={() => window.location.reload()}>
+            Reload
+          </button>
+        </div>
+      </main>
+    );
+  }
 }
 
 function JobStrip({ job }: { job: Job | null }) {

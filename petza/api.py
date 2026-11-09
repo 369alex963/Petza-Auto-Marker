@@ -26,6 +26,9 @@ from fastapi.middleware.trustedhost import TrustedHostMiddleware  # noqa: E402
 
 app.add_middleware(TrustedHostMiddleware, allowed_hosts=["127.0.0.1", "localhost", "testserver"])
 RULES_EXTS = {".md", ".txt", ".markdown"}
+
+# Load torch and probe the hardware right away, so the first page load is quick.
+threading.Thread(target=device_info, daemon=True, name="warmup").start()
 jobs = JobRunner()
 _predictor = {"run": None, "obj": None}
 _pred_lock = threading.Lock()
@@ -156,7 +159,8 @@ def _summary(img: Path, out: Path | None, threshold: float) -> dict:
     if jp.is_file():
         try:
             m = read_marking(jp)
-            item.update(status=m.status, confidence=m.confidence, regions=len(m.regions), review=m.review)
+            item.update(status=m.status, confidence=m.confidence, regions=len(m.regions), review=m.review,
+                        size=[m.width, m.height], outline=[r.points[:: max(1, len(r.points) // 60)] for r in m.regions])
             item["needs_review"] = m.status != "reviewed" and (not m.regions or (m.confidence or 0) < threshold or (m.review is not None and not m.review.get("ok", True)))
         except Exception:
             item["status"] = "foreign"

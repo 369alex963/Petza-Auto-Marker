@@ -54,7 +54,9 @@ export function Mark({ ctx }: { ctx: AppCtx }) {
       <div className="page__head">
         <div>
           <h1 className="page__title">Photos</h1>
-          <p className="page__sub">{s?.settings.images_dir || "No photo folder chosen yet."}</p>
+          <p className="page__path" title={s?.settings.images_dir}>
+            <bdi>{!s ? " " : s.settings.images_dir || "No photo folder chosen yet."}</bdi>
+          </p>
         </div>
         <div className="toolbar">
           {s?.settings.reviewer_enabled && s.settings.anthropic_api_key ? (
@@ -106,7 +108,7 @@ export function Mark({ ctx }: { ctx: AppCtx }) {
             Try again
           </button>
         </div>
-      ) : items === null ? (
+      ) : items === null || !s ? (
         <div className="thumbs" aria-busy="true" aria-label="Loading photos">
           {Array.from({ length: 8 }, (_, i) => (
             <div key={i} className="skeleton" />
@@ -141,6 +143,13 @@ export function Mark({ ctx }: { ctx: AppCtx }) {
             <a key={i.path} className="thumb" href={editHash(i.path)} onClick={(e) => (e.preventDefault(), go(editHash(i.path)))}>
               <div className="thumb__pic">
                 <img src={imageUrl(i.path, 480)} alt="" loading="lazy" width={480} height={360} />
+                {i.outline && i.size ? (
+                  <svg viewBox={`0 0 ${i.size[0]} ${i.size[1]}`} preserveAspectRatio="xMidYMid slice" aria-hidden="true">
+                    {i.outline.map((pts, k) => (
+                      <polygon key={k} points={pts.map((p) => p.join(",")).join(" ")} />
+                    ))}
+                  </svg>
+                ) : null}
                 {i.status === "reviewed" ? (
                   <span className="thumb__tag thumb__tag--love">
                     <Heart size={14} /> Approved

@@ -28,7 +28,7 @@ export function Teach({ ctx }: { ctx: AppCtx }) {
         <div>
           <h1 className="page__title">Teach</h1>
           <p className="page__sub">
-            The app learns from Lauren's marked examples and from every photo she approves. Some photos are kept aside and never learned from, so the score below is an honest test.
+            The app learns from Lauren’s marked examples and from every photo she approves. Some photos are kept aside and never learned from, so the score below is an honest test.
           </p>
         </div>
         <div className="toolbar">
@@ -59,7 +59,7 @@ export function Teach({ ctx }: { ctx: AppCtx }) {
           {model?.iou != null ? (
             <>
               <span className="score__fig">{pct(model.iou)}</span>
-              <span className="score__label">Overlap with Lauren's own marking</span>
+              <span className="score__label">Overlap with Lauren’s own marking</span>
               <span className="score__sub">
                 Measured on {pool?.holdout ?? 0} photos kept aside. Edge accuracy {pct(model.boundary_f)}.
               </span>
@@ -82,7 +82,7 @@ export function Teach({ ctx }: { ctx: AppCtx }) {
             </div>
             <div className="stat">
               <span className="stat__n">{pool?.reviewed ?? 0}</span>
-              <span className="stat__l">Lauren's fixes</span>
+              <span className="stat__l">Lauren’s fixes</span>
             </div>
             <div className="stat">
               <span className="stat__n">{pool?.holdout ?? 0}</span>

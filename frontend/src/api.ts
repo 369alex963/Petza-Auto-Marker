@@ -76,6 +76,8 @@ export interface ImageItem {
   regions: number;
   needs_review: boolean;
   review: Review | null;
+  size?: [number, number];
+  outline?: Point[][];
 }
 
 export interface Run {
