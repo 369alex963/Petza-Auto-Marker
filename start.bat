@@ -1,5 +1,5 @@
 @echo off
-title Petza Auto-Marker
+title Wound-Recognizer
 cd /d "%~dp0"
 if not exist ".venv\Scripts\python.exe" (
   echo First run: installing. This takes a while once.

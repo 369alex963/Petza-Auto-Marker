@@ -22,8 +22,6 @@ body { min-height: 100dvh; }
 .bar { position: sticky; top: 0; z-index: var(--z-sticky-nav); height: var(--bar-h); background: var(--color-ink); color: var(--color-paper); }
 .bar__in { height: 100%; display: flex; align-items: center; gap: var(--space-lg); max-width: var(--container); margin-inline: auto; padding-inline: var(--space-lg); }
 .wordmark { display: inline-flex; align-items: center; gap: var(--space-xs); color: var(--color-paper); text-decoration: none; font-family: var(--font-display); font-size: var(--text-lg); letter-spacing: var(--tracking-display); white-space: nowrap; }
-.wordmark__heart { color: var(--color-accent); display: inline-flex; }
-.wordmark__for { font-family: var(--font-body); font-size: var(--text-sm); font-weight: 600; color: var(--color-rule); }
 .tabs { display: flex; gap: var(--space-2xs); margin-inline-start: auto; overflow-x: auto; scrollbar-width: none; }
 .tab { display: inline-flex; align-items: center; height: var(--control-h); padding: 0 var(--space-md); border-radius: var(--radius-pill); color: var(--color-rule); text-decoration: none; font-weight: 600; white-space: nowrap; transition: background-color var(--dur-micro) var(--ease-out), color var(--dur-micro) var(--ease-out); }
 .tab:hover { color: var(--color-white); background: var(--color-ink-2); }
@@ -184,7 +182,6 @@ table.runs td { padding: var(--space-sm); border-bottom: 1px solid var(--color-r
   .editor { grid-template-columns: minmax(0, 1fr); }
   .side { position: static; max-height: none; border-left: 0; border-top: var(--rule-bar) solid var(--color-ink); }
   .stage { min-height: 60dvh; }
-  .wordmark__for { display: none; }
   .stats { grid-template-columns: minmax(0, 1fr); }
 }
 @media (max-width: 40rem) {

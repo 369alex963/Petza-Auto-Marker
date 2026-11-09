@@ -119,12 +119,8 @@ export function App() {
     <>
       <header className="bar">
         <div className="bar__in">
-          <a className="wordmark" href="#/mark" aria-label="Petza Auto-Marker, photos">
-            <span className="wordmark__heart">
-              <Heart size={22} />
-            </span>
-            Petza Auto-Marker
-            <span className="wordmark__for">for Lauren</span>
+          <a className="wordmark" href="#/mark" aria-label="Wound-Recognizer, photos">
+            Wound-Recognizer
           </a>
           <nav className="tabs" aria-label="Main">
             {TABS.map((t) => (

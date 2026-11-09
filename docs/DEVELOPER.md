@@ -1,4 +1,4 @@
-# Petza Auto-Marker
+# Wound-Recognizer
 
 A local app that marks wounds on medical photos. Each mark is an outline of points, saved as one JSON file per photo for the other medical app. It learns from Lauren's marked examples and from every photo she corrects. Everything runs on this computer.
 

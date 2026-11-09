@@ -59,7 +59,7 @@ export function Mark({ ctx }: { ctx: AppCtx }) {
           </p>
         </div>
         <div className="toolbar">
-          {s?.settings.reviewer_enabled && s.settings.anthropic_api_key ? (
+          {s?.settings.reviewer_enabled && s.reviewer.ready ? (
             <button type="button" className="btn" disabled={busy || !items?.length} onClick={() => void ctx.startJob("review")}>
               <Sparkle /> AI second opinion
             </button>

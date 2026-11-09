@@ -500,7 +500,8 @@ export function Editor({ path, ctx }: { path: string; ctx: AppCtx }) {
 
         {marking?.review ? (
           <div className="review">
-            <strong>{marking.review.ok ? "AI second opinion: looks right" : "AI second opinion: please check"}</strong>
+            <strong>{marking.review.ok ? "AI second opinion: looks right" : "AI second opinion: please check"}
+              {marking.review.via ? <span className="muted"> ({marking.review.via})</span> : null}</strong>
             {marking.review.problems.length ? (
               <ul>
                 {marking.review.problems.map((p, i) => (

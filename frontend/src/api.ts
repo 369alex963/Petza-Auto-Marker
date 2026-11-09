@@ -8,10 +8,14 @@ export interface Region {
   source: "auto" | "manual";
 }
 
+export type Provider = "claude" | "openai";
+export type Connection = "account" | "api";
+
 export interface Review {
   ok: boolean;
   problems: string[];
   summary: string;
+  via?: string;
 }
 
 export interface Marking {
@@ -63,7 +67,11 @@ export interface Status {
     anthropic_api_key: boolean;
     reviewer_model: string;
     reviewer_enabled: boolean;
+    reviewer_provider: Provider;
+    openai_api_key: boolean;
+    openai_model: string;
   };
+  reviewer: { claude: Connection[]; openai: Connection[]; ready: boolean };
   rules: { loaded: boolean; labels: string[]; text: string; review_below_confidence: number };
   job: Job;
 }
@@ -137,6 +145,7 @@ export const api = {
   job: () => call<Job>("GET", "/api/jobs/current"),
   start: (kind: "import" | "train" | "mark" | "review", body?: unknown) => call<Job>("POST", `/api/jobs/${kind}`, body),
   cancel: () => call<Job>("POST", "/api/jobs/cancel"),
+  testReviewer: () => call<{ ok: boolean; via: string | null; errors: string[] }>("POST", "/api/reviewer/test"),
   runs: () => call<{ runs: Run[] }>("GET", "/api/runs"),
   useRun: (runId: string) => call<Status>("POST", `/api/runs/${encodeURIComponent(runId)}/use`),
   holdout: () => call<{ items: HoldoutItem[] }>("GET", "/api/holdout"),

@@ -25,9 +25,12 @@ class Settings(BaseModel):
     rules_path: str = ""
     examples_dir: str = ""
     output_dir: str = ""               # empty -> JSON next to each image
+    reviewer_enabled: bool = False
+    reviewer_provider: str = "claude"  # claude | openai
     anthropic_api_key: str = ""
     reviewer_model: str = "claude-opus-5-5"
-    reviewer_enabled: bool = False
+    openai_api_key: str = ""
+    openai_model: str = "gpt-6-astra"
 
 
 def load_settings() -> Settings:

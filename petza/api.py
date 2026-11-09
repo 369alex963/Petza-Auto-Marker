@@ -12,7 +12,7 @@ from fastapi.responses import FileResponse, JSONResponse, Response
 from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel
 
-from . import config, dataset, train
+from . import config, dataset, reviewer, train
 from .batch import mark_folder
 from .device import device_info
 from .imageio import list_images, load_image, open_image
@@ -20,7 +20,7 @@ from .jobs import Busy, JobRunner
 from .rules import load_rules
 from .schema import Marking, marking_path_for, read_marking, write_marking
 
-app = FastAPI(title="Petza Auto-Marker")
+app = FastAPI(title="Wound-Recognizer")
 # Blocks DNS-rebinding: a web page on another site can't talk to this local app.
 from fastapi.middleware.trustedhost import TrustedHostMiddleware  # noqa: E402
 
@@ -83,10 +83,11 @@ def status():
     rules = load_rules(s.rules_path)
     public = s.model_dump()
     public["anthropic_api_key"] = bool(s.anthropic_api_key)
+    public["openai_api_key"] = bool(s.openai_api_key)
     return {"device": device_info(), "model": model, "pool": dataset.pool_stats(), "settings": public,
             "rules": {"loaded": bool(s.rules_path and Path(s.rules_path).is_file()), "labels": rules.labels,
                       "text": rules.text, "review_below_confidence": rules.review_below_confidence},
-            "job": jobs.snapshot()}
+            "reviewer": reviewer.connections(s), "job": jobs.snapshot()}
 
 
 class SettingsIn(BaseModel):
@@ -97,6 +98,9 @@ class SettingsIn(BaseModel):
     anthropic_api_key: str | None = None
     reviewer_model: str | None = None
     reviewer_enabled: bool | None = None
+    reviewer_provider: str | None = None
+    openai_api_key: str | None = None
+    openai_model: str | None = None
 
 
 @app.post("/api/settings")
@@ -116,6 +120,8 @@ def update_settings(body: SettingsIn):
         raise HTTPException(400, f"Rules file not found: {data['rules_path']}")
     if data["rules_path"] and Path(data["rules_path"]).suffix.lower() not in RULES_EXTS:
         raise HTTPException(400, "The rules file must be a .md, .markdown or .txt file.")
+    if data["reviewer_provider"] not in reviewer.PROVIDERS:
+        raise HTTPException(400, "Unknown AI provider.")
     config.save_settings(config.Settings(**data))
     return status()
 
@@ -266,7 +272,7 @@ def job_mark(body: MarkIn | None = None):
 
     def run(progress, stop):
         result = mark_folder(s.images_dir, output_dir(s), pred, rules, progress, stop, only=only)
-        if s.reviewer_enabled and s.anthropic_api_key and not stop():
+        if s.reviewer_enabled and reviewer.connections(s)["ready"] and not stop():
             result["ai_review"] = _review_all(s, rules, progress, stop, only)
         return result
 
@@ -274,8 +280,6 @@ def job_mark(body: MarkIn | None = None):
 
 
 def _review_all(s, rules, progress, stop, only=None) -> dict:
-    from .reviewer import review
-
     out = output_dir(s)
     paths = [Path(p) for p in only] if only else list_images(s.images_dir, skip=out)
     counts = {"reviewed": 0, "flagged": 0, "unavailable": 0}
@@ -289,23 +293,29 @@ def _review_all(s, rules, progress, stop, only=None) -> dict:
         if m.status == "reviewed":
             continue
         progress(i / max(1, len(paths)), f"AI second opinion {i + 1}/{len(paths)}")
-        r = review(load_image(img_path), m, rules.text, s.anthropic_api_key, s.reviewer_model)
+        r = reviewer.review(load_image(img_path), m, rules.text, s)
         if r is None:
             counts["unavailable"] += 1
             continue
-        write_marking(m.model_copy(update={"review": r.model_dump()}), jp)
+        write_marking(m.model_copy(update={"review": r}), jp)
         counts["reviewed"] += 1
-        counts["flagged"] += 0 if r.ok else 1
+        counts["flagged"] += 0 if r["ok"] else 1
     return counts
 
 
 @app.post("/api/jobs/review")
 def job_review():
     s = settings()
-    if not s.anthropic_api_key:
-        raise HTTPException(400, "Add an Anthropic API key in Settings to use the AI second opinion.")
+    if not reviewer.connections(s)["ready"]:
+        raise HTTPException(400, "Connect an AI account or add an API key in Settings first.")
     rules = load_rules(s.rules_path)
     return _start("review", lambda progress, stop: _review_all(s, rules, progress, stop))
+
+
+@app.post("/api/reviewer/test")
+def reviewer_test():
+    """One small real call, so Settings can show which connection works."""
+    return reviewer.test(settings())
 
 
 @app.get("/api/jobs/current")

@@ -23,7 +23,7 @@ def main() -> None:
 
     port = free_port(int(os.environ.get("PETZA_PORT", 8765)))
     url = f"http://127.0.0.1:{port}"
-    print(f"\n  Petza Auto-Marker is running at {url}\n  Keep this window open. Close it to stop the app.\n")
+    print(f"\n  Wound-Recognizer is running at {url}\n  Keep this window open. Close it to stop the app.\n")
     if not os.environ.get("PETZA_NO_BROWSER"):
         threading.Timer(1.5, lambda: webbrowser.open(url)).start()
     uvicorn.run("petza.api:app", host="127.0.0.1", port=port, log_level="warning")
