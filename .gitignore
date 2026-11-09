@@ -7,3 +7,9 @@ models/
 .env*
 .pytest_cache/
 *.tsbuildinfo
+
+# Not app files: kept local, never on GitHub
+docs/MASTER_PROMPT.md
+docs/superpowers/
+tasks/
+CLAUDE.md
