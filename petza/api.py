@@ -321,7 +321,76 @@ def job_cancel():
 
 @app.get("/api/runs")
 def runs():
-    return {"runs": train.list_runs()[::-1]}
+    cur = train.current_run_dir()
+    out = []
+    for r in train.list_runs()[::-1]:
+        r["current"] = bool(cur and cur.name == r["run_id"])
+        r["available"] = (config.RUNS / r["run_id"] / "model.onnx").is_file()
+        out.append(r)
+    return {"runs": out}
+
+
+@app.post("/api/runs/{run_id}/use")
+def use_run(run_id: str):
+    """Switch back to an earlier model (or forward to one that was not promoted)."""
+    if Path(run_id).name != run_id or not (config.RUNS / run_id / "model.onnx").is_file():
+        raise HTTPException(404, "That model is not on this computer.")
+    if jobs.snapshot().get("status") == "running":
+        raise HTTPException(409, "Wait for the current job to finish.")
+    train.set_current(run_id)
+    with _pred_lock:
+        _predictor["run"] = None
+    return status()
+
+
+@app.get("/api/holdout")
+def holdout():
+    """Per-photo test scores of the model in use, hardest first."""
+    run = train.current_run_dir()
+    if run is None:
+        return {"items": []}
+    meta = json.loads((run / "meta.json").read_text(encoding="utf-8"))
+    index = dataset.load_index()
+    items = []
+    for p in sorted((meta.get("score") or {}).get("per_image", []), key=lambda p: p["iou"]):
+        entry = index.get(p["id"])
+        if entry:
+            items.append({**p, "name": Path(entry["source"]).name, "kind": entry.get("kind")})
+    return {"items": items}
+
+
+def _pool_paths(iid: str) -> tuple[Path, Path]:
+    for i, img_path, json_path in dataset.pool_items():
+        if i == iid:
+            return img_path, json_path
+    raise HTTPException(404, "That test photo is no longer in the pool.")
+
+
+@app.get("/api/compare")
+def compare(id: str, max: int = 900):
+    """A held-out photo with Lauren's outline (dark) and the app's outline (pink)."""
+    import cv2
+    import numpy as np
+
+    img_path, json_path = _pool_paths(id)
+    img = load_image(img_path)
+    truth = read_marking(json_path)
+    pred = predictor()
+    regions, _ = pred.predict(img, load_rules(settings().rules_path))
+    scale = min(1.0, max / float(np.max(img.shape[:2])))
+    view = cv2.resize(img, None, fx=scale, fy=scale, interpolation=cv2.INTER_AREA) if scale < 1 else img.copy()
+    view = np.ascontiguousarray(view[:, :, ::-1])  # RGB -> BGR for cv2
+    width = 2 if max < 600 else 3  # (`max` is the size argument here, not the builtin)
+
+    def draw(regs, color):
+        for r in regs:
+            pts = np.round(np.asarray(r.points, dtype=np.float64) * scale).astype(np.int32)
+            cv2.polylines(view, [pts], True, color, width, cv2.LINE_AA)
+
+    draw(truth.regions, (60, 40, 40))
+    draw(regions, (170, 70, 235))
+    ok, buf = cv2.imencode(".jpg", view, [cv2.IMWRITE_JPEG_QUALITY, 88])
+    return Response(buf.tobytes(), media_type="image/jpeg", headers={"Cache-Control": "no-store"})
 
 
 # ---------- frontend ----------

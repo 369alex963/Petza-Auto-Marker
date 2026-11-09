@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
 import type { AppCtx } from "../App";
-import { api, type Run } from "../api";
+import { api, compareUrl, type HoldoutItem, type Run } from "../api";
 import { Heart } from "../icons";
 
 const pct = (v: number | null | undefined) => (v == null ? "" : `${(v * 100).toFixed(1)}%`);
@@ -9,13 +9,39 @@ export function Teach({ ctx }: { ctx: AppCtx }) {
   const s = ctx.status;
   const [runs, setRuns] = useState<Run[] | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const [hard, setHard] = useState<HoldoutItem[]>([]);
+  const [open, setOpen] = useState<HoldoutItem | null>(null);
+  const [switching, setSwitching] = useState(false);
+  const runId = ctx.status?.model?.run_id ?? "";
 
   useEffect(() => {
     api
       .runs()
       .then((r) => setRuns(r.runs))
       .catch((e: Error) => setError(e.message));
-  }, [ctx.jobVersion]);
+  }, [ctx.jobVersion, runId]);
+
+  useEffect(() => {
+    setOpen(null);
+    if (!runId) return setHard([]);
+    api
+      .holdout()
+      .then((r) => setHard(r.items.slice(0, 8)))
+      .catch(() => setHard([]));
+  }, [runId]);
+
+  const switchTo = async (id: string) => {
+    setSwitching(true);
+    try {
+      await api.useRun(id);
+      await ctx.refresh();
+      ctx.toast("Switched to that model");
+    } catch (e) {
+      ctx.toast((e as Error).message);
+    } finally {
+      setSwitching(false);
+    }
+  };
 
   const busy = ctx.job?.status === "running";
   const pool = s?.pool;
@@ -95,6 +121,36 @@ export function Teach({ ctx }: { ctx: AppCtx }) {
         </section>
       </div>
 
+      {hard.length ? (
+        <section aria-labelledby="hard">
+          <h2 className="panel__title" id="hard">
+            Hardest test photos
+          </h2>
+          <p className="muted" style={{ marginBottom: "var(--space-sm)" }}>
+            Dark line: Lauren’s outline. Pink line: the app’s. More examples like these help the most.
+          </p>
+          <div className="thumbs">
+            {hard.map((h) => (
+              <button type="button" key={h.id} className="thumb thumb--btn" aria-pressed={open?.id === h.id} onClick={() => setOpen(open?.id === h.id ? null : h)}>
+                <span className="thumb__pic">
+                  <img src={compareUrl(h.id, runId, 440)} alt={`Test photo ${h.name}`} loading="lazy" />
+                  <span className="thumb__tag">{pct(h.iou)}</span>
+                </span>
+                <span className="thumb__name">{h.name}</span>
+              </button>
+            ))}
+          </div>
+          {open ? (
+            <figure className="compare">
+              <img src={compareUrl(open.id, runId, 1400)} alt={`Lauren’s and the app’s outline on ${open.name}`} />
+              <figcaption className="muted">
+                {open.name}: overlap {pct(open.iou)}, edges {pct(open.boundary_f)}.
+              </figcaption>
+            </figure>
+          ) : null}
+        </section>
+      ) : null}
+
       <section aria-labelledby="hist">
         <h2 className="panel__title" id="hist" style={{ marginBottom: "var(--space-sm)" }}>
           Teaching history
@@ -118,6 +174,7 @@ export function Teach({ ctx }: { ctx: AppCtx }) {
                 <th>Edges</th>
                 <th>Time</th>
                 <th>Result</th>
+                <th>Model</th>
               </tr>
             </thead>
             <tbody>
@@ -129,13 +186,18 @@ export function Teach({ ctx }: { ctx: AppCtx }) {
                   <td>{pct(r.previous_iou)}</td>
                   <td>{pct(r.boundary_f)}</td>
                   <td>{r.minutes} min</td>
+                  <td>{r.promoted ? "Better or equal, switched" : "Kept the older one"}</td>
                   <td>
-                    {r.promoted ? (
+                    {r.current ? (
                       <span className="pill pill--live">
                         <Heart size={12} /> In use
                       </span>
+                    ) : r.available ? (
+                      <button type="button" className="btn btn--small" disabled={busy || switching} onClick={() => void switchTo(r.run_id)}>
+                        Use this one
+                      </button>
                     ) : (
-                      <span className="pill">Kept the older one</span>
+                      <span className="muted">Removed</span>
                     )}
                   </td>
                 </tr>

@@ -60,3 +60,34 @@ def test_import_teach_mark(env):
         scores.append(iou(polygons_to_mask([r.points for r in m.regions], h, w),
                           polygons_to_mask([s["points"] for s in g["shapes"]], h, w)))
     assert np.mean(scores) > 0.85, scores
+
+    # ---- HTTP API on the trained model ----
+    import time
+
+    import petza.api as api_mod
+    from fastapi.testclient import TestClient
+
+    importlib.reload(api_mod)
+    c = TestClient(api_mod.app)
+    assert c.post("/api/settings", json={"images_dir": str(tmp / "new"), "output_dir": str(out)}).status_code == 200
+
+    runs = c.get("/api/runs").json()["runs"]
+    assert runs[0]["current"] and runs[0]["available"]
+    assert c.post(f"/api/runs/{runs[0]['run_id']}/use").status_code == 200
+    assert c.post("/api/runs/nope/use").status_code == 404
+
+    hard = c.get("/api/holdout").json()["items"]
+    assert hard and hard == sorted(hard, key=lambda h: h["iou"])
+    r = c.get(f"/api/compare?id={hard[0]['id']}&max=300")
+    assert r.status_code == 200 and r.headers["content-type"] == "image/jpeg" and r.content[:2] == b"\xff\xd8"
+
+    one = str(imgs[0])
+    (out / imgs[0].name.replace(".jpg", ".json")).unlink()
+    assert c.post("/api/jobs/mark", json={"only": [one]}).status_code == 200
+    for _ in range(120):
+        job = c.get("/api/jobs/current").json()
+        if job["status"] != "running":
+            break
+        time.sleep(0.5)
+    assert job["status"] == "done", job
+    assert c.get(f"/api/marking?path={one}").json()["marking"]["regions"]

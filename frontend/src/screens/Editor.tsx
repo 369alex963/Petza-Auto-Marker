@@ -39,6 +39,8 @@ export function Editor({ path, ctx }: { path: string; ctx: AppCtx }) {
   const svgRef = useRef<SVGSVGElement>(null);
   const stageRef = useRef<HTMLDivElement>(null);
   const dragStartRegions = useRef<Region[] | null>(null);
+  const remarking = useRef(false);
+  const [reload, setReload] = useState(0);
 
   const s = ctx.status;
   const threshold = s?.rules.review_below_confidence ?? 0.75;
@@ -58,6 +60,9 @@ export function Editor({ path, ctx }: { path: string; ctx: AppCtx }) {
         setMarking(r.marking);
         setRegions(r.marking.regions);
         setSelected(r.marking.regions.length ? 0 : null);
+        setPast([]);
+        setFuture([]);
+        setDirty(false);
         if (!r.marking.regions.length) setTool("lasso");
       })
       .catch((e: Error) => alive && setError(e.message));
@@ -65,7 +70,21 @@ export function Editor({ path, ctx }: { path: string; ctx: AppCtx }) {
     return () => {
       alive = false;
     };
-  }, [path]);
+  }, [path, reload]);
+
+  // After "Mark this photo" finishes, show the new outline.
+  useEffect(() => {
+    if (remarking.current && ctx.job?.status !== "running") {
+      remarking.current = false;
+      setReload((n) => n + 1);
+    }
+  }, [ctx.jobVersion, ctx.job?.status]);
+
+  const remark = () => {
+    if (dirty && !window.confirm("Mark this photo again? Your unsaved changes will be replaced.")) return;
+    remarking.current = true;
+    void ctx.startJob("mark", { only: [path] });
+  };
 
   const fit = useCallback(() => {
     if (!marking || !stageRef.current) return;
@@ -471,6 +490,12 @@ export function Editor({ path, ctx }: { path: string; ctx: AppCtx }) {
           </div>
         ) : marking ? (
           <div className="mood">Not marked yet. Draw the outline with the point lasso.</div>
+        ) : null}
+
+        {marking && marking.status !== "reviewed" && s?.model ? (
+          <button type="button" className="btn btn--small" disabled={ctx.job?.status === "running"} onClick={remark}>
+            <Smiley confidence={null} size={16} threshold={threshold} /> {marking.model_version ? "Mark this photo again" : "Mark this photo"}
+          </button>
         ) : null}
 
         {marking?.review ? (

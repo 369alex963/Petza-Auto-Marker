@@ -93,6 +93,17 @@ export interface Run {
   device: string;
   minutes: number;
   finetuned: boolean;
+  current?: boolean;
+  available?: boolean;
+}
+
+export interface HoldoutItem {
+  id: string;
+  name: string;
+  kind: string;
+  iou: number;
+  dice: number;
+  boundary_f: number;
 }
 
 async function call<T>(method: string, url: string, body?: unknown): Promise<T> {
@@ -127,6 +138,9 @@ export const api = {
   start: (kind: "import" | "train" | "mark" | "review", body?: unknown) => call<Job>("POST", `/api/jobs/${kind}`, body),
   cancel: () => call<Job>("POST", "/api/jobs/cancel"),
   runs: () => call<{ runs: Run[] }>("GET", "/api/runs"),
+  useRun: (runId: string) => call<Status>("POST", `/api/runs/${encodeURIComponent(runId)}/use`),
+  holdout: () => call<{ items: HoldoutItem[] }>("GET", "/api/holdout"),
 };
 
+export const compareUrl = (id: string, version: string, max = 900) => `/api/compare?id=${encodeURIComponent(id)}&max=${max}&v=${encodeURIComponent(version)}`;
 export const imageUrl = (path: string, max = 0) => `/api/image?path=${encodeURIComponent(path)}${max ? `&max=${max}` : ""}`;

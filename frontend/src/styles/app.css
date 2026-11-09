@@ -110,6 +110,10 @@ dl.facts dd { margin: 0; color: var(--color-ink-2); overflow-wrap: anywhere; }
 .thumb__tag { position: absolute; top: var(--space-xs); right: var(--space-xs); display: inline-flex; align-items: center; gap: var(--space-2xs); height: 28px; padding: 0 var(--space-xs); border-radius: var(--radius-pill); background: var(--color-white); color: var(--color-ink); font-size: var(--text-sm); font-weight: 700; font-variant-numeric: tabular-nums; }
 .thumb__tag--love { background: var(--color-accent); color: var(--color-accent-ink); }
 .thumb__tag--look { background: var(--color-accent-2); }
+.thumb--btn { background: none; border: 0; padding: 0; font: inherit; text-align: left; cursor: pointer; }
+.thumb--btn[aria-pressed="true"] .thumb__pic { border-color: var(--color-accent); }
+.compare { margin-top: var(--space-lg); display: grid; gap: var(--space-xs); }
+.compare img { max-width: 100%; border-radius: var(--radius-card); border: 5px solid var(--color-white); box-shadow: 4px 5px 0 var(--color-ink); background: var(--color-slot); }
 .thumb__name { font-size: var(--text-sm); font-weight: 600; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .thumb__meta { font-size: var(--text-sm); color: var(--color-muted); }
 .skeleton { background: var(--color-paper-2); border-radius: var(--radius-card); aspect-ratio: 4 / 3; }

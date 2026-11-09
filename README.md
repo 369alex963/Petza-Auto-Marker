@@ -13,7 +13,8 @@ Double-click `start.bat`. The first time, it installs everything into `.venv` in
 1. **Folders:** choose the photo folder, the rules file (`.md` or `.txt`, optional), the folder of marked examples, and optionally an output folder.
 2. **Teach:** press **Import examples**, then **Teach now**. Some photos are kept aside and never learned from. The score is how well the app's outline overlaps Lauren's outline on those photos.
 3. **Photos:** press **Mark all photos**. The smiley shows how sure the app is. "Worth a look" lists the doubtful photos first.
-4. **Editor:** drag points, click the outline to add a point, right-click a point to remove it, press `L` to draw a new area with the point lasso. Press **Approve** (the heart) to save. Approved photos are never overwritten, and they teach the app on the next Teach.
+   The **Hardest test photos** on Teach show Lauren's outline (dark) next to the app's (pink), so you can see where it still struggles. Any earlier model can be switched back on from the history.
+4. **Editor:** drag points, click the outline to add a point, right-click a point to remove it, press `L` to draw a new area with the point lasso. Press **Approve** (the heart) to save. Approved photos are never overwritten, and they teach the app on the next Teach. **Mark this photo** re-runs the app on just the open photo.
 
 ## Rules file
 
