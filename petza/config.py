@@ -31,17 +31,25 @@ class Settings(BaseModel):
     anthropic_api_key: str = ""
     reviewer_model: str = "claude-opus-5-5"
     openai_api_key: str = ""
-    openai_model: str = "gpt-6-astra"
+    openai_model: str = "gpt-6-luna"     # fast and affordable, reads images: hundreds of photos per account
+    openai_effort: str = "low"            # reasoning effort: low is enough to pick from ready outlines
     groq_api_key: str = ""
     groq_model: str = "qwen/qwen3.8-27b"  # Groq's vision model (free plan)
     ai_runs: int = 1                      # 1, 2 or 3 questions per photo (majority vote)
+    ai_scope: str = "unsure"              # "unsure": ask only when the photo is not clear-cut; "all": every photo
+    ai_accounts_off: list[str] = []       # providers whose account this app must not use ("Disconnect")
+    settings_version: int = 2
     ai_edges: bool = False                # let the AI move the edge (tight/wide); measured less exact, so off
 
 
 def load_settings() -> Settings:
     if SETTINGS_FILE.is_file():
         try:
-            return Settings.model_validate_json(SETTINGS_FILE.read_text(encoding="utf-8"))
+            s = Settings.model_validate_json(SETTINGS_FILE.read_text(encoding="utf-8"))
+            raw = json.loads(SETTINGS_FILE.read_text(encoding="utf-8"))
+            if raw.get("settings_version", 1) < 2 and s.openai_model == "gpt-6-astra":
+                s.openai_model = "gpt-6-luna"  # the old default spent the account's quota in a few dozen photos
+            return s
         except ValueError:
             pass
     return Settings()

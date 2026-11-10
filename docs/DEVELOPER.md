@@ -23,14 +23,19 @@ The local model draws, the online AI decides (`petza/refine.py`). Per photo:
 1. `quality.py` checks brightness, contrast and sharpness. A dark or flat photo is corrected only in the copy that is sent.
 2. From the local probability map, each candidate region (found at p ≥ 0.25) gets three pixel-precise outlines: A tight (p ≥ 0.7), B normal (argmax, the local result) and C wide (p ≥ 0.3).
 3. The AI receives:
-   - the photo, at most 1568 px and re-encoded, so it carries no EXIF and no file name;
+   - the photo, at most 1024 px and re-encoded, so it carries no EXIF and no file name;
    - a numbered A/B/C overlay, zoomed in when the regions are small;
    - the active prompt.
 4. It answers with strict JSON: per region `keep`, `outline`, `label` and `reason`, plus `missed` boxes. A missed box is re-predicted locally at p ≥ 0.2 and outlined.
 5. By default the edge stays local (B). On real diabetic photos the AI's A/C choice was less exact (IoU 0.792 against 0.820). Setting `ai_edges` allows A/C only where the edge is unsure (tight/wide area < 0.75).
-6. Settings `ai_runs` sets 1, 2 or 3 questions per photo, decided by majority vote; a tie keeps the local result.
-7. Answers are cached in `data/cache/ai`. Rate limits are waited out. Any failure keeps the local result.
-8. Applied outlines join the training pool as kind `ai`. They are never held out, so the promote gate still scores against human markings only.
+6. Quota:
+   - `openai_model` defaults to `gpt-6-luna` with `openai_effort` `low`.
+   - The Codex call uses `--ignore-user-config -c project_doc_max_bytes=0`, and images are at most 1024 px.
+   - `ai_scope` `unsure` (the default) skips clear-cut photos: one candidate with a B outline, confidence at or above the threshold, good quality.
+   - `ai_accounts_off` is the app-only Disconnect.
+7. Settings `ai_runs` sets 1, 2 or 3 questions per photo, decided by majority vote; a tie keeps the local result.
+8. Answers are cached in `data/cache/ai`. Rate limits are waited out. Any failure keeps the local result.
+9. Applied outlines join the training pool as kind `ai`. They are never held out, so the promote gate still scores against human markings only.
 
 The same code runs for **Mark all**, **Mark this photo again** and **Try one photo** (`POST /api/try`).
 

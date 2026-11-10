@@ -24,13 +24,14 @@ export function Settings({ ctx }: { ctx: AppCtx }) {
   const [enabled, setEnabled] = useState(false);
   const [provider, setProvider] = useState<Provider>("claude");
   const [key, setKey] = useState("");
-  const [models, setModels] = useState<Record<Provider, string>>({ claude: "claude-opus-5-5", openai: "gpt-6-astra", groq: "qwen/qwen3.8-27b" });
+  const [models, setModels] = useState<Record<Provider, string>>({ claude: "claude-opus-5-5", openai: "gpt-6-luna", groq: "qwen/qwen3.8-27b" });
   const [error, setError] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
   const [testing, setTesting] = useState(false);
   const [test, setTest] = useState<TestResult | null>(null);
   const [runs, setRuns] = useState(1);
   const [edges, setEdges] = useState(false);
+  const [scope, setScope] = useState<"unsure" | "all">("unsure");
   const [accounts, setAccounts] = useState<Record<"claude" | "openai", Account> | null>(null);
   const [waiting, setWaiting] = useState(false);
 
@@ -56,11 +57,13 @@ export function Settings({ ctx }: { ctx: AppCtx }) {
     setModels({ claude: s.settings.reviewer_model, openai: s.settings.openai_model, groq: s.settings.groq_model });
     setRuns(s.settings.ai_runs || 1);
     setEdges(!!s.settings.ai_edges);
-  }, [s?.settings.reviewer_enabled, s?.settings.reviewer_provider, s?.settings.reviewer_model, s?.settings.openai_model, s?.settings.groq_model, s?.settings.ai_runs, s?.settings.ai_edges]); // eslint-disable-line react-hooks/exhaustive-deps
+    setScope(s.settings.ai_scope || "unsure");
+  }, [s?.settings.reviewer_enabled, s?.settings.reviewer_provider, s?.settings.reviewer_model, s?.settings.openai_model, s?.settings.groq_model, s?.settings.ai_runs, s?.settings.ai_edges, s?.settings.ai_scope]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const hasKey = s ? s.settings[KEY_FIELD[provider]] : false;
   const acc = provider !== "groq" ? accounts?.[provider] : undefined;
-  const hasAccount = !!acc?.signed_in;
+  const hasAccount = !!acc?.signed_in && acc.in_app;
+  const offInApp = !!acc?.signed_in && !acc.in_app;
 
   useEffect(() => {
     if (waiting && hasAccount && provider !== "groq") {
@@ -86,7 +89,7 @@ export function Settings({ ctx }: { ctx: AppCtx }) {
     if (provider === "groq") return;
     setAccounts(await api.disconnect(provider));
     await ctx.refresh();
-    ctx.toast("Signed out");
+    ctx.toast(`This app no longer uses your ${ACCOUNT_APP[provider].name} account`);
   };
 
   const persist = async () => {
@@ -96,7 +99,8 @@ export function Settings({ ctx }: { ctx: AppCtx }) {
       ai_edges: edges,
       reviewer_provider: provider,
       reviewer_model: models.claude,
-      openai_model: models.openai.trim() || "gpt-6-astra",
+      openai_model: models.openai.trim() || "gpt-6-luna",
+      ai_scope: scope,
       groq_model: models.groq.trim() || "qwen/qwen3.8-27b",
     };
     if (key.trim()) body[KEY_FIELD[provider]] = key.trim();
@@ -217,7 +221,7 @@ export function Settings({ ctx }: { ctx: AppCtx }) {
                   <>
                     <span>Connected{acc?.who ? `: ${acc.who}` : ""}. No key needed.</span>
                     <button type="button" className="btn btn--small" onClick={() => void disconnect()}>
-                      Disconnect
+                      Disconnect from this app
                     </button>
                   </>
                 ) : (
@@ -228,7 +232,9 @@ export function Settings({ ctx }: { ctx: AppCtx }) {
                     <span className="muted">
                       {waiting
                         ? `Sign in on ${ACCOUNT_APP[provider].site} in the window that opened.`
-                        : acc?.installed
+                        : offInApp
+                          ? "Disconnected from this app. Your account stays signed in everywhere else."
+                          : acc?.installed
                           ? `Opens ${ACCOUNT_APP[provider].site} to sign in.`
                           : `Downloads the official ${ACCOUNT_APP[provider].app} app, then opens ${ACCOUNT_APP[provider].site} to sign in.`}
                     </span>
@@ -280,6 +286,13 @@ export function Settings({ ctx }: { ctx: AppCtx }) {
                 <option value="claude-opus-5-5">Claude Opus 5.5 (most careful)</option>
                 <option value="claude-sonnet-5-5">Claude Sonnet 5.5 (faster)</option>
               </select>
+            ) : provider === "openai" ? (
+              <select id="model" name="model" className="input" value={models.openai} onChange={(e) => setModels((m) => ({ ...m, openai: e.target.value }))}>
+                <option value="gpt-6-luna">GPT-6-Luna: fast and affordable, hundreds of photos (recommended)</option>
+                <option value="gpt-6.1-sol">GPT-6.1-Sol: stronger, uses the quota faster</option>
+                <option value="gpt-6-astra">GPT-6-Astra: strongest, uses the quota much faster</option>
+                {!["gpt-6-luna", "gpt-6.1-sol", "gpt-6-astra"].includes(models.openai) ? <option value={models.openai}>{models.openai}</option> : null}
+              </select>
             ) : (
               <input
                 id="model"
@@ -309,6 +322,22 @@ export function Settings({ ctx }: { ctx: AppCtx }) {
             </span>
           </fieldset>
 
+          <fieldset className="field">
+            <legend className="field__label">Which photos to ask about</legend>
+            <label className="switch">
+              <input type="radio" name="scope" checked={scope === "unsure"} onChange={() => setScope("unsure")} />
+              Only photos that are not clear-cut (recommended)
+            </label>
+            <label className="switch">
+              <input type="radio" name="scope" checked={scope === "all"} onChange={() => setScope("all")} />
+              Every photo
+            </label>
+            <span className="field__help">
+              A photo with one confident wound and good quality is not sent: measured on real photos, the AI added nothing there. That keeps the quota for the
+              photos that need it: extra areas, faint or missed wounds, low confidence, dark or blurry photos.
+            </span>
+          </fieldset>
+
           <div className="field">
             <label className="switch">
               <input type="checkbox" checked={edges} onChange={(e) => setEdges(e.target.checked)} />
@@ -323,7 +352,7 @@ export function Settings({ ctx }: { ctx: AppCtx }) {
 
           <div className="note">
             <p>
-              <strong>What is sent:</strong> the photo made smaller (at most 1568 pixels), a copy with the numbered outlines, and the marking prompt. No file name, date,
+              <strong>What is sent:</strong> the photo made smaller (at most 1024 pixels), a copy with the numbered outlines, and the marking prompt. No file name, date,
               place or camera details. A dark or flat photo is brightened in the sent copy only, so the wound colours read right. The original stays as it is.
             </p>
           </div>

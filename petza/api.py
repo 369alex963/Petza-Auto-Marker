@@ -103,6 +103,8 @@ class SettingsIn(BaseModel):
     groq_model: str | None = None
     ai_runs: int | None = None
     ai_edges: bool | None = None
+    ai_scope: str | None = None
+    openai_effort: str | None = None
 
 
 @app.post("/api/settings")
@@ -120,6 +122,8 @@ def update_settings(body: SettingsIn):
                 raise HTTPException(400, f"Folder not found: {data[k]}")
     if data["reviewer_provider"] not in reviewer.PROVIDERS:
         raise HTTPException(400, "Unknown AI provider.")
+    if data["ai_scope"] not in ("unsure", "all") or data["openai_effort"] not in ("low", "medium", "high"):
+        raise HTTPException(400, "Unknown AI option.")
     if data["ai_runs"] not in (1, 2, 3):
         raise HTTPException(400, "Runs per photo must be 1, 2 or 3.")
     config.save_settings(config.Settings(**data))
@@ -381,13 +385,18 @@ def _account_provider(name: str) -> str:
 
 @app.get("/api/ai/accounts")
 def ai_accounts():
-    return {"claude": reviewer.account("claude"), "openai": reviewer.account("openai")}
+    off = settings().ai_accounts_off
+    return {p: {**reviewer.account(p), "in_app": p not in off} for p in ("claude", "openai")}
 
 
 @app.post("/api/ai/connect")
 def ai_connect(body: ProviderIn):
-    """Download the official app if it is missing, then open its sign-in in the browser."""
+    """Let this app use the account again; download the official app if it is
+    missing, and open its sign-in in the browser if it is signed out."""
     name = _account_provider(body.provider)
+    s = settings()
+    if name in s.ai_accounts_off:
+        config.save_settings(s.model_copy(update={"ai_accounts_off": [p for p in s.ai_accounts_off if p != name]}))
 
     def run(progress, stop):
         installed = False
@@ -405,7 +414,11 @@ def ai_connect(body: ProviderIn):
 
 @app.post("/api/ai/disconnect")
 def ai_disconnect(body: ProviderIn):
-    reviewer.sign_out(_account_provider(body.provider))
+    """Stop this app from using the account. The official app stays signed in,
+    so ChatGPT or Claude keep working everywhere else on this computer."""
+    name = _account_provider(body.provider)
+    s = settings()
+    config.save_settings(s.model_copy(update={"ai_accounts_off": sorted({*s.ai_accounts_off, name})}))
     return ai_accounts()
 
 

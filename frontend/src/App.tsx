@@ -246,7 +246,10 @@ function summarize(job: Job): string {
   if (!r) return "";
   if (job.kind === "import") return `${r.imported} of ${r.total} examples imported${(r.no_marking as unknown[])?.length ? `, ${(r.no_marking as unknown[]).length} had no marking file` : ""}.`;
   if (job.kind === "mark" || job.kind === "review") {
-    const ai = (r.ai_improved as number) || (r.ai_failed as number) ? ` The AI improved ${r.ai_improved}${r.ai_failed ? `, ${r.ai_failed} kept the local marking because the AI did not answer` : ""}.` : "";
+    const asked = (r.ai_improved as number) || (r.ai_failed as number) || (r.ai_not_needed as number);
+    const ai = asked
+      ? ` The AI checked ${r.ai_improved}${r.ai_not_needed ? `, ${r.ai_not_needed} were clear-cut and not sent` : ""}${r.ai_failed ? `, ${r.ai_failed} kept the local marking because the AI did not answer` : ""}.`
+      : "";
     return `${r.marked} marked, ${r.needs_review} worth a look, ${r.skipped_reviewed} already approved.${ai}`;
   }
   if (job.kind === "connect") return "Finish signing in in the browser window that opened, then come back here.";

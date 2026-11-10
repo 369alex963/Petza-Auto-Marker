@@ -97,8 +97,8 @@ def account(provider: str) -> dict:
 
 def connections(s) -> dict:
     """What can be used right now, in the order it is tried."""
-    claude = [m for m, ok in (("account", _cli("claude")), ("api", s.anthropic_api_key)) if ok]
-    openai = [m for m, ok in (("account", _cli("codex")), ("api", s.openai_api_key)) if ok]
+    claude = [m for m, ok in (("account", _cli("claude") and "claude" not in s.ai_accounts_off), ("api", s.anthropic_api_key)) if ok]
+    openai = [m for m, ok in (("account", _cli("codex") and "openai" not in s.ai_accounts_off), ("api", s.openai_api_key)) if ok]
     groq = ["api"] if s.groq_api_key else []
     order = {"claude": claude, "openai": openai, "groq": groq}.get(s.reviewer_provider, [])
     return {"claude": claude, "openai": openai, "groq": groq, "ready": bool(order), "install": INSTALL}
@@ -207,12 +207,14 @@ def _claude_account(images: list[bytes], prompt: str, model: str, schema: type[B
         return schema.model_validate(out)
 
 
-def _openai_account(images: list[bytes], prompt: str, model: str, schema: type[BaseModel]) -> BaseModel:
+def _openai_account(images: list[bytes], prompt: str, model: str, schema: type[BaseModel], effort: str = "low") -> BaseModel:
     """OpenAI Codex CLI, signed in with the ChatGPT account (no API key)."""
     with tempfile.TemporaryDirectory(prefix="wr-ai-") as d:
         schema_file, answer = Path(d) / "schema.json", Path(d) / "answer.json"
         schema_file.write_text(json.dumps(_schema(schema)), encoding="utf-8")
-        cmd = [_cli("codex"), "exec", "--skip-git-repo-check", "--sandbox", "read-only",
+        # Lean: no user config, plugins or AGENTS.md (they cost thousands of tokens a photo).
+        cmd = [_cli("codex"), "exec", "--skip-git-repo-check", "--sandbox", "read-only", "--ignore-user-config",
+               "-c", f"model_reasoning_effort={effort}", "-c", "project_doc_max_bytes=0",
                "--output-schema", str(schema_file), "--output-last-message", str(answer), "--ephemeral"]
         for n, data in zip(_names(len(images)), images):
             (Path(d) / n).write_bytes(data)
@@ -246,13 +248,14 @@ def _claude_api(images: list[bytes], prompt: str, model: str, key: str, schema: 
     return response.parsed_output
 
 
-def _openai_api(images: list[bytes], prompt: str, model: str, key: str, schema: type[BaseModel]) -> BaseModel:
+def _openai_api(images: list[bytes], prompt: str, model: str, key: str, schema: type[BaseModel], effort: str = "low") -> BaseModel:
     from openai import OpenAI
 
     client = OpenAI(api_key=key, timeout=180, max_retries=2)
     content = [{"type": "input_text", "text": prompt}]
     content += [{"type": "input_image", "image_url": "data:image/jpeg;base64," + _b64(j)} for j in images]
-    response = client.responses.parse(model=model, input=[{"role": "user", "content": content}], text_format=schema)
+    response = client.responses.parse(model=model, input=[{"role": "user", "content": content}], text_format=schema,
+                                      reasoning={"effort": effort})
     if response.output_parsed is None:
         raise RuntimeError("ChatGPT declined to look at this photo.")
     return response.output_parsed
@@ -283,12 +286,12 @@ def _attempts(s):
             yield "Groq API key", lambda i, p, sc: _groq_api(i, p, s.groq_model, s.groq_api_key, sc)
         return
     if s.reviewer_provider == "openai":
-        if _cli("codex"):
-            yield "ChatGPT account", lambda i, p, sc: _openai_account(i, p, s.openai_model, sc)
+        if _cli("codex") and "openai" not in s.ai_accounts_off:
+            yield "ChatGPT account", lambda i, p, sc: _openai_account(i, p, s.openai_model, sc, s.openai_effort)
         if s.openai_api_key:
-            yield "OpenAI API key", lambda i, p, sc: _openai_api(i, p, s.openai_model, s.openai_api_key, sc)
+            yield "OpenAI API key", lambda i, p, sc: _openai_api(i, p, s.openai_model, s.openai_api_key, sc, s.openai_effort)
     else:
-        if _cli("claude"):
+        if _cli("claude") and "claude" not in s.ai_accounts_off:
             yield "Claude account", lambda i, p, sc: _claude_account(i, p, s.reviewer_model, sc)
         if s.anthropic_api_key:
             yield "Claude API key", lambda i, p, sc: _claude_api(i, p, s.reviewer_model, s.anthropic_api_key, sc)
@@ -300,7 +303,7 @@ def _rate_limited(e: Exception) -> bool:
 
 
 def _model_name(s) -> str:
-    return {"groq": s.groq_model, "openai": s.openai_model}.get(s.reviewer_provider, s.reviewer_model)
+    return {"groq": s.groq_model, "openai": f"{s.openai_model}/{s.openai_effort}"}.get(s.reviewer_provider, s.reviewer_model)
 
 
 def ask(images: list[bytes], prompt: str, schema: type[BaseModel], s, salt: str = "") -> tuple[BaseModel | None, str | None, list[str]]:

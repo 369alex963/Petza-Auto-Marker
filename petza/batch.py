@@ -38,7 +38,7 @@ def mark_folder(images_dir, output_dir, predictor: Predictor, rules: Rules, prog
                 should_stop=lambda: False, only: list[str] | None = None, s=None, use_ai: bool = False) -> dict:
     out_dir = Path(output_dir) if output_dir else None
     images = [Path(p) for p in only] if only else list_images(images_dir, skip=out_dir)
-    done = {"marked": 0, "skipped_reviewed": 0, "needs_review": 0, "ai_improved": 0, "ai_failed": 0,
+    done = {"marked": 0, "skipped_reviewed": 0, "needs_review": 0, "ai_improved": 0, "ai_failed": 0, "ai_not_needed": 0,
             "poor_quality": 0, "failed": [], "total": len(images)}
     for i, img_path in enumerate(images):
         if should_stop():
@@ -54,7 +54,7 @@ def mark_folder(images_dir, output_dir, predictor: Predictor, rules: Rules, prog
             save_result(img_path, img, r, predictor.run_id, out_dir)
             done["marked"] += 1
             if r.ai is not None:
-                done["ai_improved" if r.ai.get("ok") else "ai_failed"] += 1
+                done["ai_not_needed" if r.ai.get("skipped") else "ai_improved" if r.ai.get("ok") else "ai_failed"] += 1
             if r.quality != "good":
                 done["poor_quality"] += 1
             if not r.regions or r.confidence < rules.review_below_confidence or r.quality == "blurry":

@@ -113,7 +113,9 @@ export function TryOne({ ctx, path: initial }: { ctx: AppCtx; path?: string }) {
               <dd>
                 {!result.used_ai
                   ? "Off: local model only"
-                  : ai?.ok
+                  : ai?.skipped
+                    ? "Not asked: one confident wound in a good photo (Settings can ask about every photo)"
+                    : ai?.ok
                     ? `${ai.via}, ${ai.runs} ${ai.runs === 1 ? "run" : "runs"}, ${ai.seconds} s${ai.missed ? `, found ${ai.missed} missed ${ai.missed === 1 ? "area" : "areas"}` : ""}`
                     : "Did not answer, so the local marking is kept"}
               </dd>

@@ -39,6 +39,7 @@ export interface AiChoice {
 
 export interface AiInfo {
   ok: boolean;
+  skipped?: boolean;
   via?: string;
   runs?: number;
   choices?: AiChoice[];
@@ -53,6 +54,7 @@ export interface Account {
   installed: boolean;
   signed_in: boolean;
   who: string | null;
+  in_app: boolean;
 }
 
 export interface TryResult {
@@ -130,6 +132,9 @@ export interface Status {
     groq_model: string;
     ai_runs: number;
     ai_edges: boolean;
+    ai_scope: "unsure" | "all";
+    openai_effort: string;
+    ai_accounts_off: string[];
   };
   reviewer: { claude: Connection[]; openai: Connection[]; groq: Connection[]; ready: boolean; install: { claude: string; codex: string } };
   rules: { prompt: string; labels: string[]; review_below_confidence: number };

@@ -125,6 +125,38 @@ def test_mark_keeps_local_result_when_ai_fails(settings, monkeypatch):
     assert r.ai["ok"] is False and r.regions == r.local_regions and r.errors == ["offline"]
 
 
+class OneWound(FakePredictor):
+    def predict_full(self, img, rules):
+        from petza.infer import probs_to_regions
+
+        fg = np.clip(3 * blob(120, 120, 80), 0, 1)  # one sharp, confident wound
+        p = np.stack([1 - fg, fg], -1).astype(np.float32)
+        return (*probs_to_regions(p, self.classes, rules, None), p)
+
+
+def test_clear_cut_photo_is_not_sent(settings, monkeypatch):
+    asked = []
+    monkeypatch.setattr(refine.reviewer, "ask", lambda *a, **k: (asked.append(1), (answer([(1, True, "B")]), "Fake", []))[1])
+    rng = np.random.default_rng(1)
+    img = np.clip(rng.normal(150, 50, (H, W, 3)), 0, 255).astype(np.uint8)  # a "good" photo
+    r = refine.mark(OneWound(), img, Rules(), settings, use_ai=True)
+    assert r.ai["skipped"] and not asked and r.regions == r.local_regions
+    settings.ai_scope = "all"
+    r = refine.mark(OneWound(), img, Rules(), settings, use_ai=True)
+    assert asked and r.ai["ok"]
+
+
+def test_old_expensive_default_moves_to_the_cheap_model(tmp_path, monkeypatch):
+    monkeypatch.setenv("PETZA_DATA", str(tmp_path))
+    import petza.config as config
+
+    importlib.reload(config)
+    config.SETTINGS_FILE.write_text('{"openai_model": "gpt-6-astra"}', encoding="utf-8")
+    assert config.load_settings().openai_model == "gpt-6-luna"
+    config.save_settings(config.Settings(openai_model="gpt-6-astra"))  # chosen on purpose after the change: kept
+    assert config.load_settings().openai_model == "gpt-6-astra"
+
+
 def test_three_runs_ask_three_times(settings, monkeypatch):
     settings.ai_runs = 3
     salts = []

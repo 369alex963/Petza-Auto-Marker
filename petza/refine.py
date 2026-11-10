@@ -29,7 +29,7 @@ from .infer import predict_window
 from .rules import Rules
 from .schema import Region
 
-MAX_SIDE = 1568      # longest side of what is sent (the providers' sweet spot)
+MAX_SIDE = 1024      # longest side of what is sent: enough to judge tissue, about half the image tokens of 1568
 FIND = 0.25          # regions are searched at this probability, so faint wounds are candidates too
 TIGHT, WIDE = 0.7, 0.3
 SURE_EDGE = 0.75     # tight area / wide area at or above this: the local edge is sharp, keep it
@@ -289,6 +289,12 @@ def _confidence(probs: np.ndarray, regions: list[Region], h: int, w: int) -> lis
 
 # ---------- one photo, start to end ----------
 
+def clear_cut(cands: list[Candidate], conf: float, status: str, rules: Rules) -> bool:
+    """Nothing for the AI to decide: exactly one area, found by the local model
+    with confidence, and a good photo (no faint extra candidates, no doubt)."""
+    return len(cands) == 1 and bool(cands[0].outlines.get("B")) and conf >= rules.review_below_confidence and status == "good"
+
+
 def mark(pred, img: np.ndarray, rules: Rules, s=None, use_ai: bool = False, keep_views: bool = False) -> Result:
     """The full marking of one photo: quality check, local model, and (when
     `use_ai`) the AI's choices. Used by "Mark all", "Mark this photo again" and
@@ -302,6 +308,11 @@ def mark(pred, img: np.ndarray, rules: Rules, s=None, use_ai: bool = False, keep
     h, w = img.shape[:2]
     spacing = rules.point_spacing_px or (pred.meta.get("spacing_frac") * (h * h + w * w) ** 0.5 if pred.meta.get("spacing_frac") else None)
     cands = candidates(probs, pred.classes, rules, spacing)
+    if clear_cut(cands, conf, status, rules) and getattr(s, "ai_scope", "unsure") != "all":
+        # One confident area with a sharp result and a good photo: measured, the AI adds nothing here.
+        # Not asking keeps the account's quota for the photos that need it.
+        result.ai = {"ok": False, "skipped": True, "notes": "Clear photo: one confident area, so the AI was not asked."}
+        return result
     asked, rest = cands[:MAX_CANDIDATES], cands[MAX_CANDIDATES:]
     corrected = quality.needs_correction(status)
     sent = quality.correct(img) if corrected else img

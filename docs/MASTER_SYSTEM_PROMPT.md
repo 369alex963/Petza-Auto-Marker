@@ -114,7 +114,7 @@ Work rules:
    - **B normal** (argmax, the local result)
    - **C wide** (p ≥ 0.3)
 3. **What is sent:**
-   - the photo, at most 1568 px and re-encoded from pixels, so it carries **no EXIF, GPS, date, camera or file name**;
+   - the photo, at most 1024 px and re-encoded from pixels, so it carries **no EXIF, GPS, date, camera or file name**;
    - a second image with the regions numbered and A/B/C drawn in three colours, zoomed in when the regions are small;
    - the active marking prompt.
 4. **Strict JSON answer:**
@@ -124,9 +124,11 @@ Work rules:
 
    Reasons and notes are written in the language of the prompt. The app re-runs the local model inside each missed box and adds a precise outline.
 5. **The edge stays local by default.** Measured on real diabetic photos against professional markings, the local edge was more exact: IoU 0.820, against 0.792 when the AI moved it. So by default the AI decides keep/remove and missed wounds, and the edge is the local B outline. The setting **Also let the AI move the edge** (off) allows A/C only where the local edge is unsure, meaning the tight/wide area ratio is below 0.75.
-6. **Questions per photo: 1 (default), 2 or 3.** Each decision is a majority vote; a tie keeps the local result. The UI explains that each extra question costs the same time again and the same quota again.
-7. **Apply automatically and save.** Any failure (offline, timeout, bad JSON, refusal) keeps the local result. Answers are cached by hash of the images, prompt, provider, model and run number. Rate limits (429) are waited out and retried.
-8. **Learning.** AI-picked outlines join the training pool as kind `ai`. They are never held out, so scores always compare against people. They never replace a person's marking in the pool.
+6. **Hundreds of photos per account.** The default OpenAI model is cheap and fast (GPT-6-Luna, low reasoning). The Codex call is lean: `--ignore-user-config` and `project_doc_max_bytes=0`, so no user plugins or AGENTS.md. Images are at most 1024 px. **Only photos that are not clear-cut are sent**: a good photo with exactly one confident area is skipped, because measured, the AI added nothing there. "Every photo" is an option. Stronger models can be picked, with a warning about quota. An old expensive default migrates to the cheap one once.
+7. **Disconnect from this app** stops this app from using an account without signing the official app out; Connect re-enables it at once.
+8. **Questions per photo: 1 (default), 2 or 3.** Each decision is a majority vote; a tie keeps the local result. The UI explains that each extra question costs the same time again and the same quota again.
+9. **Apply automatically and save.** Any failure (offline, timeout, bad JSON, refusal) keeps the local result. Answers are cached by hash of the images, prompt, provider, model and run number. Rate limits (429) are waited out and retried.
+10. **Learning.** AI-picked outlines join the training pool as kind `ai`. They are never held out, so scores always compare against people. They never replace a person's marking in the pool.
 
 **Providers:**
 - **Claude:**

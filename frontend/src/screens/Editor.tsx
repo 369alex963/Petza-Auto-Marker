@@ -504,7 +504,11 @@ export function Editor({ path, ctx }: { path: string; ctx: AppCtx }) {
         {marking?.ai ? (
           <div className="review">
             <strong>
-              {marking.ai.ok ? "The online AI chose this outline" : "The online AI did not answer, so this is the local marking"}
+              {marking.ai.skipped
+                ? "Clear photo, so the online AI was not asked"
+                : marking.ai.ok
+                  ? "The online AI checked this marking"
+                  : "The online AI did not answer, so this is the local marking"}
               {marking.ai.via ? <span className="muted"> ({marking.ai.via})</span> : null}
             </strong>
             {marking.ai.choices?.length ? (
