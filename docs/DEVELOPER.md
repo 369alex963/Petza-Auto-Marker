@@ -18,7 +18,7 @@ Double-click `start.bat`. The first time, it installs everything into `.venv` in
 
 ## Marking prompt
 
-The prompt the online AI reads lives in the app (Folders, "Marking prompt for the AI"), saved in `data/prompts.json`; several named prompts, one active, a Hebrew default in `petza/prompts.py`. An optional block at the top sets the measurable rules:
+The prompt the online AI reads lives in the app (Settings, "Marking prompt for the AI"; reviewers: Claude or ChatGPT through the signed-in desktop app or an API key, or Groq with a free API key), saved in `data/prompts.json`; several named prompts, one active, a Hebrew default in `petza/prompts.py`. An optional block at the top sets the measurable rules:
 
 ```
 ---

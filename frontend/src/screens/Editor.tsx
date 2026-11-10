@@ -505,11 +505,13 @@ export function Editor({ path, ctx }: { path: string; ctx: AppCtx }) {
             {marking.review.problems.length ? (
               <ul>
                 {marking.review.problems.map((p, i) => (
-                  <li key={i}>{p}</li>
+                  <li key={i} dir="auto">
+                    {p}
+                  </li>
                 ))}
               </ul>
             ) : (
-              <span>{marking.review.summary}</span>
+              <span dir="auto">{marking.review.summary}</span>
             )}
           </div>
         ) : null}

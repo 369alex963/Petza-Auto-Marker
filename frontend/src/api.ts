@@ -8,7 +8,7 @@ export interface Region {
   source: "auto" | "manual";
 }
 
-export type Provider = "claude" | "openai";
+export type Provider = "claude" | "openai" | "groq";
 export type Connection = "account" | "api";
 
 export interface Prompts {
@@ -77,8 +77,10 @@ export interface Status {
     reviewer_provider: Provider;
     openai_api_key: boolean;
     openai_model: string;
+    groq_api_key: boolean;
+    groq_model: string;
   };
-  reviewer: { claude: Connection[]; openai: Connection[]; ready: boolean; install: { claude: string; codex: string } };
+  reviewer: { claude: Connection[]; openai: Connection[]; groq: Connection[]; ready: boolean; install: { claude: string; codex: string } };
   rules: { prompt: string; labels: string[]; review_below_confidence: number };
   job: Job;
 }

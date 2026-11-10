@@ -26,11 +26,13 @@ class Settings(BaseModel):
     examples_dir: str = ""
     output_dir: str = ""               # empty -> JSON next to each image
     reviewer_enabled: bool = False
-    reviewer_provider: str = "claude"  # claude | openai
+    reviewer_provider: str = "claude"  # claude | openai | groq
     anthropic_api_key: str = ""
     reviewer_model: str = "claude-opus-5-5"
     openai_api_key: str = ""
     openai_model: str = "gpt-6-astra"
+    groq_api_key: str = ""
+    groq_model: str = "qwen/qwen3.8-27b"  # Groq's vision model (free plan)
 
 
 def load_settings() -> Settings:

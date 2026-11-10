@@ -25,7 +25,8 @@ from pydantic import BaseModel, ConfigDict
 from .schema import Marking, Region
 
 MAX_SIDE = 1568
-PROVIDERS = ("claude", "openai")
+PROVIDERS = ("claude", "openai", "groq")
+GROQ_URL = "https://api.groq.com/openai/v1"  # OpenAI-compatible
 CLI_TIMEOUT = 300
 NO_WINDOW = subprocess.CREATE_NO_WINDOW if sys.platform == "win32" else 0
 
@@ -108,8 +109,9 @@ def connections(s) -> dict:
     """What can be used right now, in the order it is tried."""
     claude = [m for m, ok in (("account", _cli("claude")), ("api", s.anthropic_api_key)) if ok]
     openai = [m for m, ok in (("account", _cli("codex")), ("api", s.openai_api_key)) if ok]
-    order = claude if s.reviewer_provider == "claude" else openai
-    return {"claude": claude, "openai": openai, "ready": bool(order), "install": INSTALL}
+    groq = ["api"] if s.groq_api_key else []
+    order = {"claude": claude, "openai": openai, "groq": groq}.get(s.reviewer_provider, [])
+    return {"claude": claude, "openai": openai, "groq": groq, "ready": bool(order), "install": INSTALL}
 
 
 def _run(cmd: list[str], prompt: str, cwd: str) -> subprocess.CompletedProcess:
@@ -185,7 +187,31 @@ def _openai_api(jpeg: bytes, prompt: str, model: str, key: str) -> ReviewResult:
     return response.output_parsed
 
 
+def _groq_api(jpeg: bytes, prompt: str, model: str, key: str) -> ReviewResult:
+    """Groq (free plan available): OpenAI-compatible chat API with JSON mode."""
+    from openai import OpenAI
+
+    client = OpenAI(api_key=key, base_url=GROQ_URL, timeout=120, max_retries=2)
+    shape = 'Answer with only a JSON object: {"ok": true or false, "problems": ["..."], "summary": "..."}'
+    response = client.chat.completions.create(
+        model=model,
+        messages=[{"role": "user", "content": [
+            {"type": "text", "text": prompt + "\n\n" + shape},
+            {"type": "image_url", "image_url": {"url": "data:image/jpeg;base64," + base64.standard_b64encode(jpeg).decode("utf-8")}},
+        ]}],
+        response_format={"type": "json_object"},
+        temperature=0.2,
+        max_completion_tokens=1500,
+    )
+    text = response.choices[0].message.content or ""
+    return ReviewResult.model_validate_json(text[text.find("{"): text.rfind("}") + 1])
+
+
 def _attempts(s):
+    if s.reviewer_provider == "groq":
+        if s.groq_api_key:
+            yield "Groq API key", lambda j, p: _groq_api(j, p, s.groq_model, s.groq_api_key)
+        return
     if s.reviewer_provider == "openai":
         if _cli("codex"):
             yield "ChatGPT account", lambda j, p: _openai_account(j, p, s.openai_model)
@@ -224,9 +250,10 @@ def test(s) -> dict:
     pts = [[160 + 62 * np.cos(a), 160 + 62 * np.sin(a)] for a in t]
     m = Marking(image="test.jpg", width=320, height=320, regions=[Region(id="r1", points=pts)])
     if not connections(s)["ready"]:
-        missing = ("ChatGPT: the ChatGPT / Codex app was not found on this computer and no OpenAI API key is saved."
-                   if s.reviewer_provider == "openai" else
-                   "Claude: the Claude Code app was not found on this computer and no Anthropic API key is saved.")
+        missing = {
+            "openai": "ChatGPT: the ChatGPT / Codex app was not found on this computer and no OpenAI API key is saved.",
+            "groq": "Groq: no Groq API key is saved yet. Get a free one at console.groq.com.",
+        }.get(s.reviewer_provider, "Claude: the Claude Code app was not found on this computer and no Anthropic API key is saved.")
         return {"ok": False, "via": None, "errors": [missing]}
     from . import prompts
 

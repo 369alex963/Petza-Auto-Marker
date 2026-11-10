@@ -82,6 +82,7 @@ def status():
     public = s.model_dump()
     public["anthropic_api_key"] = bool(s.anthropic_api_key)
     public["openai_api_key"] = bool(s.openai_api_key)
+    public["groq_api_key"] = bool(s.groq_api_key)
     return {"device": device_info(), "model": model, "pool": dataset.pool_stats(), "settings": public,
             "rules": {"prompt": prompts.load()["active"], "labels": rules.labels,
                       "review_below_confidence": rules.review_below_confidence},
@@ -98,6 +99,8 @@ class SettingsIn(BaseModel):
     reviewer_provider: str | None = None
     openai_api_key: str | None = None
     openai_model: str | None = None
+    groq_api_key: str | None = None
+    groq_model: str | None = None
 
 
 @app.post("/api/settings")
