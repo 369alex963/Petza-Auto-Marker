@@ -222,6 +222,7 @@ export const api = {
   useRun: (runId: string) => call<Status>("POST", `/api/runs/${encodeURIComponent(runId)}/use`),
   holdout: () => call<{ items: HoldoutItem[] }>("GET", "/api/holdout"),
   approveSure: () => call<{ approved: number }>("POST", "/api/approve-sure"),
+  approve: (paths: string[]) => call<{ approved: number }>("POST", "/api/approve", { paths }),
   tryOne: (path: string, save = false) => call<TryResult>("POST", "/api/try", { path, save }),
   accounts: () => call<Record<"claude" | "openai", Account>>("GET", "/api/ai/accounts"),
   connect: (provider: "claude" | "openai") => call<Job>("POST", "/api/ai/connect", { provider }),

@@ -236,6 +236,34 @@ def save_marking(body: SaveIn):
     return {"ok": True, "json_path": str(jp), "pool": dataset.pool_stats()}
 
 
+class ApproveIn(BaseModel):
+    paths: list[str]
+
+
+@app.post("/api/approve")
+def approve_picked(body: ApproveIn):
+    """Approve the photos the person ticked in the grid. A person chose them, so
+    they count like an approval in the editor and teach the app next time."""
+    s = settings()
+    if jobs.snapshot().get("status") == "running":
+        raise HTTPException(409, "Wait for the current job to finish.")
+    out = output_dir(s)
+    approved = 0
+    for path in body.paths:
+        p = check_path(path)
+        jp = marking_path_for(p, out)
+        try:
+            m = read_marking(jp)
+        except Exception:
+            continue
+        if m.status == "auto" and m.regions:
+            m = m.model_copy(update={"status": "reviewed", "approved_by": "person"})
+            write_marking(m, jp)
+            dataset.add_to_pool(p, m, "reviewed")
+            approved += 1
+    return {"approved": approved, "pool": dataset.pool_stats()}
+
+
 @app.post("/api/approve-sure")
 def approve_sure():
     """Approve, in one go, every marking the app is sure of: it has a wound, its

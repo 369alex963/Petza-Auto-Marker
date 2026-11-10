@@ -62,8 +62,44 @@ export function Mark({ ctx }: { ctx: AppCtx }) {
     }
   };
 
+  // Pick mode: tick the photos to approve, then approve them together.
+  const [picking, setPicking] = useState(false);
+  const [picked, setPicked] = useState<Set<string>>(new Set());
+  const canPick = (i: ImageItem) => i.status === "auto" && i.regions > 0;
+  const togglePick = (path: string) =>
+    setPicked((prev) => {
+      const next = new Set(prev);
+      if (next.has(path)) next.delete(path);
+      else next.add(path);
+      return next;
+    });
+  const stopPicking = () => {
+    setPicking(false);
+    setPicked(new Set());
+  };
+  const approvePicked = async () => {
+    setApproving(true);
+    try {
+      const r = await api.approve([...picked]);
+      ctx.toast(`${r.approved} photos approved`);
+      stopPicking();
+      setItems((await api.images()).items);
+    } catch (e) {
+      ctx.toast((e as Error).message);
+    } finally {
+      setApproving(false);
+    }
+  };
+  useEffect(() => {
+    if (!picking) return;
+    const onKey = (e: KeyboardEvent) => e.key === "Escape" && stopPicking();
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, [picking]);
+
   const busy = ctx.job?.status === "running";
   const noModel = s && !s.model;
+  const pickable = ordered.filter(canPick);
 
   return (
     <main className="page">
@@ -80,9 +116,14 @@ export function Mark({ ctx }: { ctx: AppCtx }) {
               <Sparkle /> Mark again with the AI
             </button>
           ) : null}
-          {sure > 0 ? (
+          {sure > 0 && !picking ? (
             <button type="button" className="btn" disabled={busy || approving} onClick={() => void approveSure()}>
               <Heart size={16} /> Approve all sure ones ({sure})
+            </button>
+          ) : null}
+          {items?.some(canPick) && !picking ? (
+            <button type="button" className="btn" disabled={busy} onClick={() => setPicking(true)}>
+              Choose photos to approve
             </button>
           ) : null}
           <button
@@ -119,6 +160,28 @@ export function Mark({ ctx }: { ctx: AppCtx }) {
               {label} <span className="chip__n">{counts[f]}</span>
             </button>
           ))}
+        </div>
+      ) : null}
+
+      {picking ? (
+        <div className="pickbar" role="region" aria-label="Choose photos to approve">
+          <p>
+            <strong>{picked.size} chosen.</strong> Click photos to tick them. Approved photos are kept as final and teach the app next time.
+          </p>
+          <div className="toolbar">
+            <button type="button" className="btn" onClick={() => setPicked(new Set(pickable.map((i) => i.path)))} disabled={!pickable.length}>
+              Tick all shown ({pickable.length})
+            </button>
+            <button type="button" className="btn" onClick={() => setPicked(new Set())} disabled={!picked.size}>
+              Clear
+            </button>
+            <button type="button" className="btn" onClick={stopPicking}>
+              Cancel
+            </button>
+            <button type="button" className="btn btn--primary" disabled={!picked.size || approving || busy} onClick={() => void approvePicked()}>
+              <Heart size={16} /> Approve {picked.size} chosen
+            </button>
+          </div>
         </div>
       ) : null}
 
@@ -161,8 +224,27 @@ export function Mark({ ctx }: { ctx: AppCtx }) {
       ) : (
         <div className="thumbs">
           {ordered.map((i) => (
-            <a key={i.path} className="thumb" href={editHash(i.path)} onClick={(e) => (e.preventDefault(), go(editHash(i.path)))}>
+            <a
+              key={i.path}
+              className={`thumb${picking && !canPick(i) ? " thumb--off" : ""}`}
+              href={editHash(i.path)}
+              role={picking ? "checkbox" : undefined}
+              aria-checked={picking ? picked.has(i.path) : undefined}
+              aria-disabled={picking && !canPick(i) ? true : undefined}
+              onClick={(e) => {
+                e.preventDefault();
+                if (!picking) go(editHash(i.path));
+                else if (canPick(i)) togglePick(i.path);
+              }}
+              onKeyDown={(e) => {
+                if (picking && e.key === " ") {
+                  e.preventDefault();
+                  if (canPick(i)) togglePick(i.path);
+                }
+              }}
+            >
               <div className="thumb__pic">
+                {picking && canPick(i) ? <span className="thumb__tick" aria-hidden="true">{picked.has(i.path) ? "✓" : ""}</span> : null}
                 <img src={imageUrl(i.path, 480)} alt="" loading="lazy" width={480} height={360} />
                 {i.outline && i.size ? (
                   <svg viewBox={`0 0 ${i.size[0]} ${i.size[1]}`} preserveAspectRatio="xMidYMid slice" aria-hidden="true">

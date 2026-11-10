@@ -179,6 +179,7 @@ The UI is in English. It is professional, calm and friendly, with a playful stic
    - filter chips: All, Worth a look, Approved, Not marked;
    - **Mark all photos**, plus **Mark again with the AI** when the AI is on;
    - **Approve all sure ones**: approve in one go every photo with a wound, confidence at or above the threshold, and not blurry. These are stored as `approved_by: "auto"`: never overwritten, but not used for training, because no person checked them;
+   - **Choose photos to approve**: a pick mode where the person ticks any marked photos (or all shown) and approves them together. These count as `approved_by: "person"` and join the training pool;
    - a progress strip with Stop.
 2. **Try one photo:**
    - Runs the exact batch pipeline on one chosen photo and shows: the local outline, what the AI was shown (A/B/C), the final result, and a table of each area's decision, outline, agreement and reason.

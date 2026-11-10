@@ -92,6 +92,15 @@ def test_import_teach_mark(env):
     assert job["status"] == "done", job
     assert c.get(f"/api/marking?path={one}").json()["marking"]["regions"]
 
+    # Approve the ticked ones: a person chose them, so they teach the app.
+    items = c.get("/api/images").json()["items"]
+    picked = min((i for i in items if i["status"] == "auto" and i["regions"]), key=lambda i: i["confidence"] or 0)
+    pool_before = c.get("/api/status").json()["pool"]["total"]
+    assert c.post("/api/approve", json={"paths": [picked["path"], picked["path"]]}).json()["approved"] == 1
+    after = {i["path"]: i for i in c.get("/api/images").json()["items"]}
+    assert after[picked["path"]]["status"] == "reviewed" and after[picked["path"]]["approved_by"] == "person"
+    assert c.get("/api/status").json()["pool"]["total"] == pool_before + 1
+
     # Approve all sure ones: sure markings become final, never training examples.
     items = c.get("/api/images").json()["items"]
     sure = [i for i in items if i["status"] == "auto" and i["regions"] and not i["needs_review"]]
