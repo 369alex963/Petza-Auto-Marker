@@ -190,14 +190,14 @@ def _names(n: int) -> list[str]:
     return [f"image{i + 1}.jpg" for i in range(n)]
 
 
-def _claude_account(images: list[bytes], prompt: str, model: str, schema: type[BaseModel]) -> BaseModel:
+def _claude_account(images: list[bytes], prompt: str, model: str, schema: type[BaseModel], effort: str = "low") -> BaseModel:
     """Claude Code CLI, signed in with the Claude account (no API key)."""
     with tempfile.TemporaryDirectory(prefix="wr-ai-") as d:
         names = _names(len(images))
         for n, data in zip(names, images):
             (Path(d) / n).write_bytes(data)
         cmd = [_cli("claude"), "-p", "--output-format", "json", "--json-schema", json.dumps(_schema(schema)),
-               "--model", model, "--tools", "Read", "--allowedTools", "Read", "--setting-sources", "",  # skip plugins and hooks: 14 s instead of 2 min
+               "--model", model, "--effort", effort, "--tools", "Read", "--allowedTools", "Read", "--setting-sources", "",  # skip plugins and hooks: 14 s instead of 2 min
                "--strict-mcp-config", "--disable-slash-commands", "--no-session-persistence"]
         r = _run(cmd, prompt + FILE_NOTE.format(names=", ".join(names)), d)
         data = json.loads(r.stdout or "{}")
@@ -231,7 +231,7 @@ def _b64(data: bytes) -> str:
     return base64.standard_b64encode(data).decode("utf-8")
 
 
-def _claude_api(images: list[bytes], prompt: str, model: str, key: str, schema: type[BaseModel]) -> BaseModel:
+def _claude_api(images: list[bytes], prompt: str, model: str, key: str, schema: type[BaseModel], effort: str = "low") -> BaseModel:
     import anthropic
 
     client = anthropic.Anthropic(api_key=key, timeout=180, max_retries=2)
@@ -239,7 +239,7 @@ def _claude_api(images: list[bytes], prompt: str, model: str, key: str, schema: 
     response = client.messages.parse(
         model=model,
         max_tokens=6000,
-        output_config={"effort": "medium"},
+        **({} if "haiku" in model else {"output_config": {"effort": effort}}),
         messages=[{"role": "user", "content": content + [{"type": "text", "text": prompt}]}],
         output_format=schema,
     )
@@ -292,9 +292,9 @@ def _attempts(s):
             yield "OpenAI API key", lambda i, p, sc: _openai_api(i, p, s.openai_model, s.openai_api_key, sc, s.openai_effort)
     else:
         if _cli("claude") and "claude" not in s.ai_accounts_off:
-            yield "Claude account", lambda i, p, sc: _claude_account(i, p, s.reviewer_model, sc)
+            yield "Claude account", lambda i, p, sc: _claude_account(i, p, s.reviewer_model, sc, s.claude_effort)
         if s.anthropic_api_key:
-            yield "Claude API key", lambda i, p, sc: _claude_api(i, p, s.reviewer_model, s.anthropic_api_key, sc)
+            yield "Claude API key", lambda i, p, sc: _claude_api(i, p, s.reviewer_model, s.anthropic_api_key, sc, s.claude_effort)
 
 
 def _rate_limited(e: Exception) -> bool:
@@ -303,7 +303,7 @@ def _rate_limited(e: Exception) -> bool:
 
 
 def _model_name(s) -> str:
-    return {"groq": s.groq_model, "openai": f"{s.openai_model}/{s.openai_effort}"}.get(s.reviewer_provider, s.reviewer_model)
+    return {"groq": s.groq_model, "openai": f"{s.openai_model}/{s.openai_effort}"}.get(s.reviewer_provider, f"{s.reviewer_model}/{s.claude_effort}")
 
 
 def ask(images: list[bytes], prompt: str, schema: type[BaseModel], s, salt: str = "") -> tuple[BaseModel | None, str | None, list[str]]:

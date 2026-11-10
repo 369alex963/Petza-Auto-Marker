@@ -22,9 +22,9 @@ type TestResult = { ok: boolean; via: string | null; errors: string[] };
 export function Settings({ ctx }: { ctx: AppCtx }) {
   const s = ctx.status;
   const [enabled, setEnabled] = useState(false);
-  const [provider, setProvider] = useState<Provider>("claude");
+  const [provider, setProvider] = useState<Provider>("openai");
   const [key, setKey] = useState("");
-  const [models, setModels] = useState<Record<Provider, string>>({ claude: "claude-opus-5-5", openai: "gpt-6-luna", groq: "qwen/qwen3.8-27b" });
+  const [models, setModels] = useState<Record<Provider, string>>({ claude: "claude-haiku-5-5", openai: "gpt-6-luna", groq: "qwen/qwen3.8-27b" });
   const [error, setError] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
   const [testing, setTesting] = useState(false);
@@ -172,12 +172,12 @@ export function Settings({ ctx }: { ctx: AppCtx }) {
             <legend className="field__label">Which AI</legend>
             <div className="field__row">
               <label className="switch">
-                <input type="radio" name="provider" checked={provider === "claude"} onChange={() => pick("claude")} />
-                Claude
-              </label>
-              <label className="switch">
                 <input type="radio" name="provider" checked={provider === "openai"} onChange={() => pick("openai")} />
                 ChatGPT
+              </label>
+              <label className="switch">
+                <input type="radio" name="provider" checked={provider === "claude"} onChange={() => pick("claude")} />
+                Claude
               </label>
               <label className="switch">
                 <input type="radio" name="provider" checked={provider === "groq"} onChange={() => pick("groq")} />
@@ -283,8 +283,9 @@ export function Settings({ ctx }: { ctx: AppCtx }) {
             </label>
             {provider === "claude" ? (
               <select id="model" name="model" className="input" value={models.claude} onChange={(e) => setModels((m) => ({ ...m, claude: e.target.value }))}>
-                <option value="claude-opus-5-5">Claude Opus 5.5 (most careful)</option>
-                <option value="claude-sonnet-5-5">Claude Sonnet 5.5 (faster)</option>
+                <option value="claude-haiku-5-5">Claude Haiku 5.5: fast and affordable, hundreds of photos (recommended)</option>
+                <option value="claude-sonnet-5-5">Claude Sonnet 5.5: stronger, uses the quota faster</option>
+                <option value="claude-opus-5-5">Claude Opus 5.5: strongest, uses the quota much faster</option>
               </select>
             ) : provider === "openai" ? (
               <select id="model" name="model" className="input" value={models.openai} onChange={(e) => setModels((m) => ({ ...m, openai: e.target.value }))}>

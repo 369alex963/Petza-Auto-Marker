@@ -151,8 +151,10 @@ def test_old_expensive_default_moves_to_the_cheap_model(tmp_path, monkeypatch):
     import petza.config as config
 
     importlib.reload(config)
-    config.SETTINGS_FILE.write_text('{"openai_model": "gpt-6-astra"}', encoding="utf-8")
-    assert config.load_settings().openai_model == "gpt-6-luna"
+    config.SETTINGS_FILE.write_text('{"openai_model": "gpt-6-astra", "reviewer_model": "claude-opus-5-5"}', encoding="utf-8")
+    s = config.load_settings()
+    assert s.openai_model == "gpt-6-luna" and s.reviewer_model == "claude-haiku-5-5"
+    assert config.Settings().reviewer_provider == "openai"
     config.save_settings(config.Settings(openai_model="gpt-6-astra"))  # chosen on purpose after the change: kept
     assert config.load_settings().openai_model == "gpt-6-astra"
 

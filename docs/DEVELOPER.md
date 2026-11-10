@@ -29,7 +29,10 @@ The local model draws, the online AI decides (`petza/refine.py`). Per photo:
 4. It answers with strict JSON: per region `keep`, `outline`, `label` and `reason`, plus `missed` boxes. A missed box is re-predicted locally at p ≥ 0.2 and outlined.
 5. By default the edge stays local (B). On real diabetic photos the AI's A/C choice was less exact (IoU 0.792 against 0.820). Setting `ai_edges` allows A/C only where the edge is unsure (tight/wide area < 0.75).
 6. Quota:
+   - The default provider is `openai`.
    - `openai_model` defaults to `gpt-6-luna` with `openai_effort` `low`.
+   - `reviewer_model` (Claude) defaults to `claude-haiku-5-5` with `claude_effort` `low` (CLI `--effort`).
+   - Old expensive defaults migrate once (`settings_version`).
    - The Codex call uses `--ignore-user-config -c project_doc_max_bytes=0`, and images are at most 1024 px.
    - `ai_scope` `unsure` (the default) skips clear-cut photos: one candidate with a B outline, confidence at or above the threshold, good quality.
    - `ai_accounts_off` is the app-only Disconnect.
