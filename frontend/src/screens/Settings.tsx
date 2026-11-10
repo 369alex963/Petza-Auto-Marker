@@ -1,11 +1,11 @@
 import { useEffect, useState } from "react";
 import type { AppCtx } from "../App";
-import { api, type Provider } from "../api";
+import { api, type Account, type Provider } from "../api";
 import { PromptEditor } from "./PromptEditor";
 
-const ACCOUNT_APP: Record<"claude" | "openai", { app: string; signin: string }> = {
-  claude: { app: "Claude Code", signin: "Install Claude Code and sign in with your Claude account once." },
-  openai: { app: "the ChatGPT Codex app", signin: "Install the Codex app and sign in with your ChatGPT account once." },
+const ACCOUNT_APP: Record<"claude" | "openai", { app: string; site: string; name: string }> = {
+  claude: { app: "Claude Code", site: "claude.ai", name: "Claude" },
+  openai: { app: "Codex", site: "chatgpt.com", name: "ChatGPT" },
 };
 
 const KEY_FIELD: Record<Provider, "anthropic_api_key" | "openai_api_key" | "groq_api_key"> = {
@@ -29,20 +29,68 @@ export function Settings({ ctx }: { ctx: AppCtx }) {
   const [saving, setSaving] = useState(false);
   const [testing, setTesting] = useState(false);
   const [test, setTest] = useState<TestResult | null>(null);
+  const [runs, setRuns] = useState(1);
+  const [accounts, setAccounts] = useState<Record<"claude" | "openai", Account> | null>(null);
+  const [waiting, setWaiting] = useState(false);
+
+  const loadAccounts = () => api.accounts().then(setAccounts).catch(() => undefined);
+  useEffect(() => {
+    void loadAccounts();
+  }, [ctx.jobVersion]);
+  // After "Connect", check every few seconds until the sign-in in the browser is done.
+  useEffect(() => {
+    if (!waiting) return;
+    const t = window.setInterval(() => void loadAccounts(), 4000);
+    const stop = window.setTimeout(() => setWaiting(false), 5 * 60 * 1000);
+    return () => {
+      window.clearInterval(t);
+      window.clearTimeout(stop);
+    };
+  }, [waiting]);
 
   useEffect(() => {
     if (!s) return;
     setEnabled(s.settings.reviewer_enabled);
     setProvider(s.settings.reviewer_provider);
     setModels({ claude: s.settings.reviewer_model, openai: s.settings.openai_model, groq: s.settings.groq_model });
-  }, [s?.settings.reviewer_enabled, s?.settings.reviewer_provider, s?.settings.reviewer_model, s?.settings.openai_model, s?.settings.groq_model]); // eslint-disable-line react-hooks/exhaustive-deps
+    setRuns(s.settings.ai_runs || 1);
+  }, [s?.settings.reviewer_enabled, s?.settings.reviewer_provider, s?.settings.reviewer_model, s?.settings.openai_model, s?.settings.groq_model, s?.settings.ai_runs]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const hasKey = s ? s.settings[KEY_FIELD[provider]] : false;
-  const hasAccount = provider !== "groq" && (s?.reviewer[provider].includes("account") ?? false);
+  const acc = provider !== "groq" ? accounts?.[provider] : undefined;
+  const hasAccount = !!acc?.signed_in;
+
+  useEffect(() => {
+    if (waiting && hasAccount && provider !== "groq") {
+      setWaiting(false);
+      ctx.toast(`${ACCOUNT_APP[provider].name} account connected`);
+      void ctx.refresh();
+    }
+  }, [waiting, hasAccount]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  const connect = async () => {
+    if (provider === "groq") return;
+    setError(null);
+    try {
+      await api.connect(provider);
+      setWaiting(true);
+      await ctx.refresh();
+    } catch (err) {
+      setError((err as Error).message);
+    }
+  };
+
+  const disconnect = async () => {
+    if (provider === "groq") return;
+    setAccounts(await api.disconnect(provider));
+    await ctx.refresh();
+    ctx.toast("Signed out");
+  };
 
   const persist = async () => {
-    const body: Record<string, string | boolean> = {
+    const body: Record<string, string | boolean | number> = {
       reviewer_enabled: enabled,
+      ai_runs: runs,
       reviewer_provider: provider,
       reviewer_model: models.claude,
       openai_model: models.openai.trim() || "gpt-6-astra",
@@ -99,15 +147,18 @@ export function Settings({ ctx }: { ctx: AppCtx }) {
       <div className="page__head">
         <div>
           <h1 className="page__title">Settings</h1>
-          <p className="page__sub">The app marks everything on this computer. An online AI can add a second opinion that flags doubtful photos; it never moves a point.</p>
+          <p className="page__sub">
+            The marking is done on this computer by the app's own AI model. An online AI can make it more exact: the local model draws three precise outlines for every
+            area, and the online AI picks the right one by your marking prompt. It is saved with nothing for you to do.
+          </p>
         </div>
       </div>
       <div className="cols">
         <form className="panel" onSubmit={save}>
-          <h2 className="panel__title">AI second opinion</h2>
+          <h2 className="panel__title">Online AI that improves the marking</h2>
           <label className="switch">
             <input type="checkbox" checked={enabled} onChange={(e) => setEnabled(e.target.checked)} />
-            After “Mark all photos”, also ask the AI to look at every new marking and flag the ones that may be wrong (about 10 to 20 seconds per photo)
+            Let the AI improve every marking automatically (it picks the best outline by the marking prompt)
           </label>
 
           <fieldset className="field">
@@ -155,18 +206,38 @@ export function Settings({ ctx }: { ctx: AppCtx }) {
             </div>
           ) : (
             <div className="field">
-              <span className="field__label">Account on this computer</span>
-              {hasAccount ? (
-                <span>{provider === "claude" ? "Claude Code" : "The Codex app"} is installed. Its signed-in account is used first, no key needed.</span>
-              ) : (
-                <span className="muted">
-                  Not found on this computer. {ACCOUNT_APP[provider].signin}{" "}
-                  <a href={provider === "claude" ? s?.reviewer.install.claude : s?.reviewer.install.codex} target="_blank" rel="noreferrer">
-                    Download {ACCOUNT_APP[provider].app} from the official site
-                  </a>
-                  , sign in, then press Test connection. Or add an API key below.
-                </span>
-              )}
+              <span className="field__label">{ACCOUNT_APP[provider].name} account</span>
+              <div className="account">
+                {!accounts ? (
+                  <span className="muted">Checking</span>
+                ) : hasAccount ? (
+                  <>
+                    <span>Connected{acc?.who ? `: ${acc.who}` : ""}. No key needed.</span>
+                    <button type="button" className="btn btn--small" onClick={() => void disconnect()}>
+                      Disconnect
+                    </button>
+                  </>
+                ) : (
+                  <>
+                    <button type="button" className="btn btn--primary" disabled={waiting || ctx.job?.status === "running"} onClick={() => void connect()}>
+                      {waiting ? "Waiting for the sign-in" : `Connect ${ACCOUNT_APP[provider].name} account`}
+                    </button>
+                    <span className="muted">
+                      {waiting
+                        ? `Sign in on ${ACCOUNT_APP[provider].site} in the window that opened.`
+                        : acc?.installed
+                          ? `Opens ${ACCOUNT_APP[provider].site} to sign in.`
+                          : `Downloads the official ${ACCOUNT_APP[provider].app} app, then opens ${ACCOUNT_APP[provider].site} to sign in.`}
+                    </span>
+                  </>
+                )}
+              </div>
+              <span className="field__help">
+                Like the official VS Code extension, the app signs in through {COMPANY[provider]}’s own {ACCOUNT_APP[provider].app} app and never sees your password.{" "}
+                <a href={provider === "claude" ? s?.reviewer.install.claude : s?.reviewer.install.codex} target="_blank" rel="noreferrer">
+                  About {ACCOUNT_APP[provider].app}
+                </a>
+              </span>
             </div>
           )}
 
@@ -216,7 +287,30 @@ export function Settings({ ctx }: { ctx: AppCtx }) {
                 spellCheck={false}
               />
             )}
-            <span className="field__help">Photos are sent to {COMPANY[provider]} only when the second opinion is used.</span>
+            <span className="field__help">Photos are sent to {COMPANY[provider]} only while the switch above is on.</span>
+          </div>
+
+          <fieldset className="field">
+            <legend className="field__label">Questions per photo</legend>
+            <div className="field__row">
+              {[1, 2, 3].map((n) => (
+                <label key={n} className="switch">
+                  <input type="radio" name="runs" checked={runs === n} onChange={() => setRuns(n)} />
+                  {n === 1 ? "1 (default)" : n}
+                </label>
+              ))}
+            </div>
+            <span className="field__help">
+              With 2 or 3, the AI is asked again and the majority answer wins. That is steadier, but every extra question takes the same time again (about 15 to 30
+              seconds a photo) and uses that much more of the AI’s quota.
+            </span>
+          </fieldset>
+
+          <div className="note">
+            <p>
+              <strong>What is sent:</strong> the photo made smaller (at most 1568 pixels), a copy with the numbered outlines, and the marking prompt. No file name, date,
+              place or camera details. A dark or flat photo is brightened in the sent copy only, so the wound colours read right. The original stays as it is.
+            </p>
           </div>
 
           {error ? (

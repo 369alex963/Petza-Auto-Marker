@@ -13,7 +13,7 @@ from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel
 
 from . import config, dataset, prompts, reviewer, train
-from .batch import mark_folder
+from .batch import mark_folder, save_result
 from .device import device_info
 from .imageio import list_images, load_image, open_image
 from .jobs import Busy, JobRunner
@@ -101,6 +101,7 @@ class SettingsIn(BaseModel):
     openai_model: str | None = None
     groq_api_key: str | None = None
     groq_model: str | None = None
+    ai_runs: int | None = None
 
 
 @app.post("/api/settings")
@@ -118,6 +119,8 @@ def update_settings(body: SettingsIn):
                 raise HTTPException(400, f"Folder not found: {data[k]}")
     if data["reviewer_provider"] not in reviewer.PROVIDERS:
         raise HTTPException(400, "Unknown AI provider.")
+    if data["ai_runs"] not in (1, 2, 3):
+        raise HTTPException(400, "Runs per photo must be 1, 2 or 3.")
     config.save_settings(config.Settings(**data))
     return status()
 
@@ -157,13 +160,17 @@ def browse(body: BrowseIn):
 
 def _summary(img: Path, out: Path | None, threshold: float) -> dict:
     jp = marking_path_for(img, out)
-    item = {"path": str(img), "name": img.name, "status": None, "confidence": None, "regions": 0, "needs_review": False, "review": None}
+    item = {"path": str(img), "name": img.name, "status": None, "confidence": None, "regions": 0, "needs_review": False,
+            "review": None, "ai": None, "quality": None}
     if jp.is_file():
         try:
             m = read_marking(jp)
             item.update(status=m.status, confidence=m.confidence, regions=len(m.regions), review=m.review,
+                        ai=(m.ai or {}).get("ok"), quality=m.quality,
                         size=[m.width, m.height], outline=[r.points[:: max(1, len(r.points) // 60)] for r in m.regions])
-            item["needs_review"] = m.status != "reviewed" and (not m.regions or (m.confidence or 0) < threshold or (m.review is not None and not m.review.get("ok", True)))
+            item["needs_review"] = m.status != "reviewed" and (
+                not m.regions or (m.confidence or 0) < threshold or m.quality == "blurry"
+                or (m.review is not None and not m.review.get("ok", True)))
         except Exception:
             item["status"] = "foreign"
     return item
@@ -257,6 +264,10 @@ class MarkIn(BaseModel):
     only: list[str] | None = None
 
 
+def _use_ai(s) -> bool:
+    return s.reviewer_enabled and reviewer.connections(s)["ready"]
+
+
 @app.post("/api/jobs/mark")
 def job_mark(body: MarkIn | None = None):
     s = settings()
@@ -265,47 +276,110 @@ def job_mark(body: MarkIn | None = None):
     pred = predictor()
     rules = prompts.active_rules()
     only = [str(check_path(p)) for p in body.only] if body and body.only else None
-
-    def run(progress, stop):
-        result = mark_folder(s.images_dir, output_dir(s), pred, rules, progress, stop, only=only)
-        if s.reviewer_enabled and reviewer.connections(s)["ready"] and not stop():
-            result["ai_review"] = _review_all(s, rules, progress, stop, only)
-        return result
-
-    return _start("mark", run)
-
-
-def _review_all(s, rules, progress, stop, only=None) -> dict:
-    out = output_dir(s)
-    paths = [Path(p) for p in only] if only else list_images(s.images_dir, skip=out)
-    counts = {"reviewed": 0, "flagged": 0, "unavailable": 0}
-    for i, img_path in enumerate(paths):
-        if stop():
-            break
-        jp = marking_path_for(img_path, out)
-        if not jp.is_file():
-            continue
-        m = read_marking(jp)
-        if m.status == "reviewed":
-            continue
-        progress(i / max(1, len(paths)), f"AI second opinion {i + 1}/{len(paths)}")
-        r = reviewer.review(load_image(img_path), m, rules.text, s)
-        if r is None:
-            counts["unavailable"] += 1
-            continue
-        write_marking(m.model_copy(update={"review": r}), jp)
-        counts["reviewed"] += 1
-        counts["flagged"] += 0 if r["ok"] else 1
-    return counts
+    use_ai = _use_ai(s)
+    return _start("mark", lambda progress, stop: mark_folder(s.images_dir, output_dir(s), pred, rules, progress, stop,
+                                                             only=only, s=s, use_ai=use_ai))
 
 
 @app.post("/api/jobs/review")
 def job_review():
+    """Mark every photo that is not approved again, this time with the AI's choices."""
     s = settings()
     if not reviewer.connections(s)["ready"]:
         raise HTTPException(400, "Connect an AI account or add an API key in Settings first.")
+    pred = predictor()
     rules = prompts.active_rules()
-    return _start("review", lambda progress, stop: _review_all(s, rules, progress, stop))
+    return _start("review", lambda progress, stop: mark_folder(s.images_dir, output_dir(s), pred, rules, progress, stop,
+                                                               s=s, use_ai=True))
+
+
+# ---------- try one photo ----------
+
+class TryIn(BaseModel):
+    path: str
+    save: bool = False
+
+
+def _regions_out(regions) -> list[dict]:
+    return [r.model_dump() for r in regions]
+
+
+@app.post("/api/try")
+def try_one(body: TryIn):
+    """The exact pipeline of "Mark all" on one photo, with every step shown."""
+    import base64
+    import time
+
+    from .refine import mark
+
+    p = check_path(body.path)
+    if jobs.snapshot().get("status") == "running":
+        raise HTTPException(409, "Wait for the current job to finish.")
+    s = settings()
+    pred = predictor()
+    rules = prompts.active_rules()
+    img = load_image(p)
+    started = time.time()
+    use_ai = reviewer.connections(s)["ready"]
+    r = mark(pred, img, rules, s, use_ai=use_ai, keep_views=True)
+    saved = None
+    if body.save:
+        jp = marking_path_for(p, output_dir(s))
+        if jp.is_file() and read_marking(jp).status == "reviewed":
+            raise HTTPException(409, "This photo is approved already; its marking is kept as it is.")
+        save_result(p, img, r, pred.run_id, output_dir(s))
+        saved = str(jp)
+    h, w = img.shape[:2]
+    return {
+        "size": [w, h], "quality": r.quality, "seconds": round(time.time() - started, 1), "used_ai": use_ai,
+        "local": _regions_out(r.local_regions), "final": _regions_out(r.regions), "confidence": r.confidence,
+        "candidates": [{"id": c.id, "label": c.label, "outlines": c.outlines} for c in r.candidates],
+        "options_image": base64.b64encode(r.options_jpeg).decode() if r.options_jpeg else None,
+        "ai": r.ai, "errors": r.errors, "saved": saved, "runs": s.ai_runs,
+        "provider": s.reviewer_provider,
+    }
+
+
+# ---------- AI accounts (the official apps' own sign-in) ----------
+
+class ProviderIn(BaseModel):
+    provider: str
+
+
+def _account_provider(name: str) -> str:
+    if name not in ("claude", "openai"):
+        raise HTTPException(400, "Only Claude and ChatGPT have an account sign-in. Groq uses a free API key.")
+    return name
+
+
+@app.get("/api/ai/accounts")
+def ai_accounts():
+    return {"claude": reviewer.account("claude"), "openai": reviewer.account("openai")}
+
+
+@app.post("/api/ai/connect")
+def ai_connect(body: ProviderIn):
+    """Download the official app if it is missing, then open its sign-in in the browser."""
+    name = _account_provider(body.provider)
+
+    def run(progress, stop):
+        installed = False
+        if not reviewer.account(name)["installed"]:
+            progress(0.05, "Downloading the official app")
+            reviewer.install(name, lambda m: progress(0.5, m))
+            installed = True
+        if not reviewer.account(name)["signed_in"]:
+            progress(0.9, "Opening the sign-in page in your browser")
+            reviewer.sign_in(name)
+        return {"provider": name, "installed": installed}
+
+    return _start("connect", run)
+
+
+@app.post("/api/ai/disconnect")
+def ai_disconnect(body: ProviderIn):
+    reviewer.sign_out(_account_provider(body.provider))
+    return ai_accounts()
 
 
 # ---------- marking prompts (what the online AI reads) ----------

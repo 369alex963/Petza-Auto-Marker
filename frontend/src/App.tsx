@@ -6,14 +6,16 @@ import { Mark } from "./screens/Mark";
 import { Settings } from "./screens/Settings";
 import { Setup } from "./screens/Setup";
 import { Teach } from "./screens/Teach";
+import { TryOne } from "./screens/TryOne";
 
-export type Route = { name: "mark" | "teach" | "setup" | "settings" | "edit"; path?: string };
+export type Route = { name: "mark" | "try" | "teach" | "setup" | "settings" | "edit"; path?: string };
 
 function parseHash(): Route {
   const h = window.location.hash.replace(/^#\/?/, "");
   const [name, query] = h.split("?");
   const params = new URLSearchParams(query ?? "");
   if (name === "edit") return { name: "edit", path: params.get("path") ?? undefined };
+  if (name === "try") return { name: "try", path: params.get("path") ?? undefined };
   if (name === "teach" || name === "setup" || name === "settings") return { name };
   return { name: "mark" };
 }
@@ -35,12 +37,19 @@ export interface AppCtx {
 
 const TABS: { name: Route["name"]; label: string }[] = [
   { name: "mark", label: "Photos" },
+  { name: "try", label: "Try one photo" },
   { name: "teach", label: "Teach" },
   { name: "setup", label: "Folders" },
   { name: "settings", label: "Settings" },
 ];
 
-const JOB_LABEL: Record<string, string> = { import: "Importing examples", train: "Teaching", mark: "Marking photos", review: "AI second opinion" };
+const JOB_LABEL: Record<string, string> = {
+  import: "Importing examples",
+  train: "Teaching",
+  mark: "Marking photos",
+  review: "Marking again with the AI",
+  connect: "Connecting the AI account",
+};
 
 export function App() {
   const [route, setRoute] = useState<Route>(parseHash);
@@ -145,6 +154,8 @@ export function App() {
         <Guard resetKey={window.location.hash}>
           {route.name === "edit" && route.path ? (
         <Editor key={route.path} path={route.path} ctx={ctx} />
+      ) : route.name === "try" ? (
+        <TryOne ctx={ctx} path={route.path} />
       ) : route.name === "teach" ? (
         <Teach ctx={ctx} />
       ) : route.name === "setup" ? (
@@ -234,11 +245,14 @@ function summarize(job: Job): string {
   const r = job.result as Record<string, unknown> | null;
   if (!r) return "";
   if (job.kind === "import") return `${r.imported} of ${r.total} examples imported${(r.no_marking as unknown[])?.length ? `, ${(r.no_marking as unknown[]).length} had no marking file` : ""}.`;
-  if (job.kind === "mark") return `${r.marked} marked, ${r.needs_review} worth a look, ${r.skipped_reviewed} already approved.`;
+  if (job.kind === "mark" || job.kind === "review") {
+    const ai = (r.ai_improved as number) || (r.ai_failed as number) ? ` The AI improved ${r.ai_improved}${r.ai_failed ? `, ${r.ai_failed} kept the local marking because the AI did not answer` : ""}.` : "";
+    return `${r.marked} marked, ${r.needs_review} worth a look, ${r.skipped_reviewed} already approved.${ai}`;
+  }
+  if (job.kind === "connect") return "Finish signing in in the browser window that opened, then come back here.";
   if (job.kind === "train") {
     const iou = r.iou as number | null;
     return iou == null ? "" : `Accuracy ${(iou * 100).toFixed(1)}%. ${r.promoted ? "The new model is live." : "The previous model scored better and stays."}`;
   }
-  if (job.kind === "review") return `${r.reviewed} checked, ${r.flagged} flagged.`;
   return "";
 }

@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { editHash, go, type AppCtx } from "../App";
-import { api, imageUrl, type ImageItem, type Marking, type Point, type Region } from "../api";
+import { api, imageUrl, QUALITY_TEXT, type ImageItem, type Marking, type Point, type Region } from "../api";
 import { ChevronLeft, ChevronRight, Cursor, Eye, Fit, Heart, Lasso, Redo, Smiley, Trash, Undo } from "../icons";
 
 type Tool = "edit" | "lasso";
@@ -498,9 +498,32 @@ export function Editor({ path, ctx }: { path: string; ctx: AppCtx }) {
           </button>
         ) : null}
 
+        {marking?.quality && marking.quality !== "good" ? <div className="review">{QUALITY_TEXT[marking.quality]}</div> : null}
+
+        {marking?.ai ? (
+          <div className="review">
+            <strong>
+              {marking.ai.ok ? "The online AI chose this outline" : "The online AI did not answer, so this is the local marking"}
+              {marking.ai.via ? <span className="muted"> ({marking.ai.via})</span> : null}
+            </strong>
+            {marking.ai.choices?.length ? (
+              <ul>
+                {marking.ai.choices.map((c) => (
+                  <li key={c.id} dir="auto">
+                    {c.id}: {c.keep ? `kept, outline ${c.outline}` : "removed"}
+                    {c.reason ? `: ${c.reason}` : ""}
+                  </li>
+                ))}
+              </ul>
+            ) : null}
+            {marking.ai.missed ? <span>Found {marking.ai.missed} missed {marking.ai.missed === 1 ? "area" : "areas"}.</span> : null}
+            {marking.ai.notes ? <span dir="auto">{marking.ai.notes}</span> : null}
+          </div>
+        ) : null}
+
         {marking?.review ? (
           <div className="review">
-            <strong>{marking.review.ok ? "AI second opinion: looks right" : "AI second opinion: please check"}
+            <strong>{marking.review.ok ? "Earlier AI check: looks right" : "Earlier AI check: please check"}
               {marking.review.via ? <span className="muted"> ({marking.review.via})</span> : null}</strong>
             {marking.review.problems.length ? (
               <ul>

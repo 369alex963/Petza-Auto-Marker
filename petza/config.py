@@ -13,6 +13,7 @@ MODELS = Path(os.environ.get("PETZA_MODELS", ROOT / "models"))  # bundled pretra
 POOL = DATA / "pool"            # training examples (images + our JSON)
 RUNS = DATA / "models"          # trained models, one folder per run
 CACHE = DATA / "cache"
+TOOLS = ROOT / "tools"          # official AI command-line apps the app downloaded itself
 SETTINGS_FILE = DATA / "settings.json"
 
 # Keep any library cache inside the project, never in the user profile.
@@ -33,6 +34,7 @@ class Settings(BaseModel):
     openai_model: str = "gpt-6-astra"
     groq_api_key: str = ""
     groq_model: str = "qwen/qwen3.8-27b"  # Groq's vision model (free plan)
+    ai_runs: int = 1                      # 1, 2 or 3 questions per photo (majority vote)
 
 
 def load_settings() -> Settings:

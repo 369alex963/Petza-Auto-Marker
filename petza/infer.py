@@ -149,5 +149,9 @@ class Predictor:
         return self.session.run(None, {"image": batch.astype(np.float32)})[0]
 
     def predict(self, img: np.ndarray, rules: Rules, tta: bool = True, refine: bool = True):
+        return self.predict_full(img, rules, tta, refine)[:2]
+
+    def predict_full(self, img: np.ndarray, rules: Rules, tta: bool = True, refine: bool = True):
+        """(regions, confidence, probability map); the map feeds the AI's options."""
         probs = predict_probs(self.run, img, self.size, tta=tta, refine=refine)
-        return probs_to_regions(probs, self.classes, rules, self.meta.get("spacing_frac"))
+        return (*probs_to_regions(probs, self.classes, rules, self.meta.get("spacing_frac")), probs)

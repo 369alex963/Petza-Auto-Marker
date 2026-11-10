@@ -64,7 +64,7 @@ export function PromptEditor({ onChange, toast }: { onChange: () => void; toast:
     <div className="prompt">
       <h3 className="panel__title">Marking prompt for the AI</h3>
       <p className="muted">
-        The AI second opinion reads this when it checks each marking. Claude, ChatGPT and Groq all read Hebrew. The local model does not read text; it learns from the marked examples.
+        The online AI follows this when it decides what is wound and which outline is right. Claude, ChatGPT and Groq all read Hebrew. The outlines it picks also teach the local model at the next Teach.
       </p>
       <div className="field__row">
         <label className="sr-only" htmlFor="prompt-pick">

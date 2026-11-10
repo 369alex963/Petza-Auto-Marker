@@ -1,4 +1,4 @@
-"""Marking prompts: the instructions the online AI reads when it checks a marking.
+"""Marking prompts: the instructions the online AI follows when it picks the outlines.
 
 Several named prompts live in data/prompts.json; one is active. The local model
 does not read text (it learns from the marked examples); an optional YAML block
@@ -14,8 +14,10 @@ from . import config
 from .rules import Rules, parse_rules
 
 DEFAULT_NAME = "ברירת מחדל"
+OLD_FIRST_LINE = "אתה בודק סימון של פצע בתמונה רפואית. הקו הירוק הוא הסימון האוטומטי."
+NEW_FIRST_LINE = "אתה מחליט על סימון של פצע בתמונה רפואית: לכל אזור, האם הוא פצע, ואיזה קו (A, B או C) עובר בדיוק על גבול הפצע."
 
-DEFAULT_TEXT = """אתה בודק סימון של פצע בתמונה רפואית. הקו הירוק הוא הסימון האוטומטי.
+DEFAULT_TEXT = """אתה מחליט על סימון של פצע בתמונה רפואית: לכל אזור, האם הוא פצע, ואיזה קו (A, B או C) עובר בדיוק על גבול הפצע.
 
 ## מה נחשב פצע (בתוך הקו)
 1. רקמת גרנולציה: אדומה עד אדומה-כהה, לחה ומבריקה, עם מרקם גרעיני כמו אבני מרצפת קטנות.
@@ -59,6 +61,9 @@ def load() -> dict:
         except ValueError:
             pass
     store["prompts"].setdefault(DEFAULT_NAME, DEFAULT_TEXT)
+    old = store["prompts"][DEFAULT_NAME]
+    if old.startswith(OLD_FIRST_LINE):  # the default from before the AI picked outlines
+        store["prompts"][DEFAULT_NAME] = NEW_FIRST_LINE + old[len(OLD_FIRST_LINE):]
     if store["active"] not in store["prompts"]:
         store["active"] = DEFAULT_NAME
     return store

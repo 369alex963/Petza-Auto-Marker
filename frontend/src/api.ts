@@ -25,6 +25,52 @@ export interface Review {
   via?: string;
 }
 
+export type Quality = "good" | "dark" | "low_contrast" | "blurry";
+
+export interface AiChoice {
+  id: number;
+  keep: boolean;
+  outline: "A" | "B" | "C";
+  label: string;
+  reason: string;
+  agreed: string;
+}
+
+export interface AiInfo {
+  ok: boolean;
+  via?: string;
+  runs?: number;
+  choices?: AiChoice[];
+  missed?: number;
+  notes?: string;
+  corrected?: boolean;
+  seconds?: number;
+  errors?: string[];
+}
+
+export interface Account {
+  installed: boolean;
+  signed_in: boolean;
+  who: string | null;
+}
+
+export interface TryResult {
+  size: [number, number];
+  quality: Quality;
+  seconds: number;
+  used_ai: boolean;
+  local: Region[];
+  final: Region[];
+  confidence: number;
+  candidates: { id: number; label: string; outlines: Record<"A" | "B" | "C", Point[][]> }[];
+  options_image: string | null;
+  ai: AiInfo | null;
+  errors: string[];
+  saved: string | null;
+  runs: number;
+  provider: Provider;
+}
+
 export interface Marking {
   image: string;
   width: number;
@@ -35,6 +81,8 @@ export interface Marking {
   status: "auto" | "reviewed";
   confidence: number | null;
   review: Review | null;
+  ai?: AiInfo | null;
+  quality?: Quality | null;
 }
 
 export interface Job {
@@ -65,7 +113,7 @@ export interface Status {
     train_count: number;
     device: string;
   } | null;
-  pool: { total: number; examples: number; reviewed: number; train: number; holdout: number; labels: string[] };
+  pool: { total: number; examples: number; reviewed: number; ai: number; train: number; holdout: number; labels: string[] };
   settings: {
     images_dir: string;
     rules_path: string;
@@ -79,6 +127,7 @@ export interface Status {
     openai_model: string;
     groq_api_key: boolean;
     groq_model: string;
+    ai_runs: number;
   };
   reviewer: { claude: Connection[]; openai: Connection[]; groq: Connection[]; ready: boolean; install: { claude: string; codex: string } };
   rules: { prompt: string; labels: string[]; review_below_confidence: number };
@@ -93,6 +142,8 @@ export interface ImageItem {
   regions: number;
   needs_review: boolean;
   review: Review | null;
+  ai: boolean | null;
+  quality: Quality | null;
   size?: [number, number];
   outline?: Point[][];
 }
@@ -144,7 +195,7 @@ async function call<T>(method: string, url: string, body?: unknown): Promise<T> 
 
 export const api = {
   status: () => call<Status>("GET", "/api/status"),
-  saveSettings: (s: Partial<Record<string, string | boolean>>) => call<Status>("POST", "/api/settings", s),
+  saveSettings: (s: Partial<Record<string, string | boolean | number>>) => call<Status>("POST", "/api/settings", s),
   browse: (kind: "folder" | "file", initial = "") => call<{ path: string }>("POST", "/api/browse", { kind, initial }),
   images: () => call<{ items: ImageItem[] }>("GET", "/api/images"),
   marking: (path: string) =>
@@ -162,7 +213,18 @@ export const api = {
   runs: () => call<{ runs: Run[] }>("GET", "/api/runs"),
   useRun: (runId: string) => call<Status>("POST", `/api/runs/${encodeURIComponent(runId)}/use`),
   holdout: () => call<{ items: HoldoutItem[] }>("GET", "/api/holdout"),
+  tryOne: (path: string, save = false) => call<TryResult>("POST", "/api/try", { path, save }),
+  accounts: () => call<Record<"claude" | "openai", Account>>("GET", "/api/ai/accounts"),
+  connect: (provider: "claude" | "openai") => call<Job>("POST", "/api/ai/connect", { provider }),
+  disconnect: (provider: "claude" | "openai") => call<Record<"claude" | "openai", Account>>("POST", "/api/ai/disconnect", { provider }),
 };
 
 export const compareUrl = (id: string, version: string, max = 900) => `/api/compare?id=${encodeURIComponent(id)}&max=${max}&v=${encodeURIComponent(version)}`;
+export const QUALITY_TEXT: Record<Quality, string> = {
+  good: "Good photo",
+  dark: "Dark photo: brightened for the AI only",
+  low_contrast: "Flat photo: contrast evened for the AI only",
+  blurry: "Blurry photo: worth a look",
+};
+
 export const imageUrl = (path: string, max = 0) => `/api/image?path=${encodeURIComponent(path)}${max ? `&max=${max}` : ""}`;

@@ -37,7 +37,9 @@ class Marking(BaseModel):
     created_at: str = Field(default_factory=now_iso)
     status: Literal["auto", "reviewed"] = "auto"
     confidence: float | None = None
-    review: dict | None = None  # optional AI second opinion {ok, problems, summary}
+    review: dict | None = None   # older AI second opinion {ok, problems, summary}
+    ai: dict | None = None       # what the online AI chose {via, runs, choices, missed, notes, ...}
+    quality: str | None = None   # photo quality: good | dark | low_contrast | blurry
 
     @model_validator(mode="after")
     def _inside(self):

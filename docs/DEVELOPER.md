@@ -16,9 +16,33 @@ Double-click `start.bat`. The first time, it installs everything into `.venv` in
    The **Hardest test photos** on Teach show your outline (dark) next to the app's (pink), so you can see where it still struggles. Any earlier model can be switched back on from the history.
 4. **Editor:** drag points, click the outline to add a point, right-click a point to remove it, press `L` to draw a new area with the point lasso. Press **Approve** (the heart) to save. Approved photos are never overwritten, and they teach the app on the next Teach. **Mark this photo** re-runs the app on just the open photo.
 
+## AI-guided marking (optional)
+
+The local model draws, the online AI decides (`petza/refine.py`). Per photo:
+
+1. `quality.py` checks brightness, contrast and sharpness. A dark or flat photo is corrected only in the copy that is sent.
+2. From the local probability map, each candidate region (found at p ≥ 0.25) gets three pixel-precise outlines: A tight (p ≥ 0.7), B normal (argmax, the local result) and C wide (p ≥ 0.3).
+3. The AI receives:
+   - the photo, at most 1568 px and re-encoded, so it carries no EXIF and no file name;
+   - a numbered A/B/C overlay, zoomed in when the regions are small;
+   - the active prompt.
+4. It answers with strict JSON: per region `keep`, `outline`, `label` and `reason`, plus `missed` boxes. A missed box is re-predicted locally at p ≥ 0.2 and outlined.
+5. Settings `ai_runs` sets 1, 2 or 3 questions per photo, decided by majority vote; a tie keeps the local result.
+6. Answers are cached in `data/cache/ai`. Rate limits are waited out. Any failure keeps the local result.
+7. Applied outlines join the training pool as kind `ai`. They are never held out, so the promote gate still scores against human markings only.
+
+The same code runs for **Mark all**, **Mark this photo again** and **Try one photo** (`POST /api/try`).
+
+Connections (`petza/reviewer.py`):
+- Claude uses the official Claude Code CLI; ChatGPT uses the official Codex CLI. These are the same binaries the official VS Code extensions run.
+- **Connect account** downloads the CLI into `tools/` if it is missing (Anthropic's release manifest with a sha256 check, or OpenAI's GitHub release with a size check). It then runs the CLI's own `auth login` / `login`.
+- The fallback is an API key. Groq always uses an API key.
+
+Measure whether the AI helps on your own held-out photos: `.venv\Scripts\python -m petza.compare_ai`.
+
 ## Marking prompt
 
-The prompt the online AI reads lives in the app (Settings, "Marking prompt for the AI"; reviewers: Claude or ChatGPT through the signed-in desktop app or an API key, or Groq with a free API key), saved in `data/prompts.json`; several named prompts, one active, a Hebrew default in `petza/prompts.py`. An optional block at the top sets the measurable rules:
+The prompt the online AI reads lives in the app (Settings, "Marking prompt for the AI"), saved in `data/prompts.json`; several named prompts, one active, a Hebrew default in `petza/prompts.py`. An optional block at the top sets the measurable rules:
 
 ```
 ---
@@ -38,7 +62,8 @@ When `point_spacing_px` is not set, the app copies the point spacing of the exam
 ```json
 {"image": "a.jpg", "width": 4032, "height": 3024,
  "regions": [{"id": "r1", "label": "wound", "points": [[x, y], ...], "confidence": 0.94, "source": "auto"}],
- "model_version": "m-...", "status": "auto | reviewed", "confidence": 0.94}
+ "model_version": "m-...", "status": "auto | reviewed", "confidence": 0.94,
+ "quality": "good | dark | low_contrast | blurry", "ai": {"ok": true, "via": "...", "runs": 1, "choices": [...], "missed": 0, "notes": "..."}}
 ```
 
 Points are pixels in the upright photo (EXIF rotation applied), origin top-left.

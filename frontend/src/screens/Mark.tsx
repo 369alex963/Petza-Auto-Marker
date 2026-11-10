@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from "react";
 import { editHash, go, type AppCtx } from "../App";
-import { api, imageUrl, type ImageItem } from "../api";
+import { api, imageUrl, QUALITY_TEXT, type ImageItem } from "../api";
 import { Heart, Smiley, Sparkle } from "../icons";
 
 type Filter = "all" | "look" | "approved" | "unmarked";
@@ -61,7 +61,7 @@ export function Mark({ ctx }: { ctx: AppCtx }) {
         <div className="toolbar">
           {s?.settings.reviewer_enabled && s.reviewer.ready ? (
             <button type="button" className="btn" disabled={busy || !items?.length} onClick={() => void ctx.startJob("review")}>
-              <Sparkle /> AI second opinion
+              <Sparkle /> Mark again with the AI
             </button>
           ) : null}
           <button
@@ -168,9 +168,11 @@ export function Mark({ ctx }: { ctx: AppCtx }) {
                   : i.status === "auto"
                     ? i.regions === 0
                       ? "No wound found, please check"
-                      : i.review && !i.review.ok
-                        ? "AI flagged this one"
-                        : `${i.regions} ${i.regions === 1 ? "area" : "areas"} marked`
+                      : i.quality === "blurry"
+                        ? QUALITY_TEXT.blurry
+                        : i.review && !i.review.ok
+                          ? "AI flagged this one"
+                          : `${i.regions} ${i.regions === 1 ? "area" : "areas"} marked${i.ai ? " with the AI" : ""}`
                     : i.status === "foreign"
                       ? "Has a JSON from another tool"
                       : "Not marked yet"}

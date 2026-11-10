@@ -3,7 +3,9 @@
 Layout (inside data/pool):
     <id>.<ext>   copy of the original image file
     <id>.json    its marking in our format (coordinates in EXIF-corrected pixels)
-    index.json   {id: {"source": path, "kind": "example"|"reviewed", "added": iso}}
+    index.json   {id: {"source": path, "kind": "example"|"reviewed"|"ai", "added": iso}}
+"ai" items are outlines the online AI picked; they are trained on but never
+used as held-out test photos, so scores always compare against people.
 data/labels.json keeps the ordered class list; class index = position + 1.
 """
 from __future__ import annotations
@@ -135,10 +137,13 @@ def is_holdout(iid: str) -> bool:
 
 
 def split(ids: list[str]) -> tuple[list[str], list[str]]:
-    """Stable train/holdout split by hash; at least one holdout once there are 5+ items."""
-    hold = [i for i in ids if is_holdout(i)]
-    if not hold and len(ids) >= 5:
-        hold = [min(ids, key=lambda i: hashlib.sha1(("holdout:" + i).encode()).hexdigest())]
+    """Stable train/holdout split by hash; at least one holdout once there are 5+ items.
+    AI-picked items are always trained on, never held out."""
+    index = load_index()
+    human = [i for i in ids if index.get(i, {}).get("kind") != "ai"]
+    hold = [i for i in human if is_holdout(i)]
+    if not hold and len(human) >= 5:
+        hold = [min(human, key=lambda i: hashlib.sha1(("holdout:" + i).encode()).hexdigest())]
     train = [i for i in ids if i not in hold]
     return train, hold
 
@@ -173,6 +178,7 @@ def pool_stats() -> dict:
         "total": len(items),
         "examples": sum(1 for i in ids if index.get(i, {}).get("kind") == "example"),
         "reviewed": sum(1 for i in ids if index.get(i, {}).get("kind") == "reviewed"),
+        "ai": sum(1 for i in ids if index.get(i, {}).get("kind") == "ai"),
         "train": len(train),
         "holdout": len(hold),
         "labels": labels(),

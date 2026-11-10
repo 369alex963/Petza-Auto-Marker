@@ -54,7 +54,8 @@ export function Teach({ ctx }: { ctx: AppCtx }) {
         <div>
           <h1 className="page__title">Teach</h1>
           <p className="page__sub">
-            The app learns from your marked examples and from every photo you approve. Some photos are kept aside and never learned from, so the score below is an honest test.
+            The app learns from your marked examples, every photo you approve and the outlines the online AI chose. Some of your own photos are kept aside and never
+            learned from, so the score below is an honest test against your marking.
           </p>
         </div>
         <div className="toolbar">
@@ -109,6 +110,10 @@ export function Teach({ ctx }: { ctx: AppCtx }) {
             <div className="stat">
               <span className="stat__n">{pool?.reviewed ?? 0}</span>
               <span className="stat__l">Fixes</span>
+            </div>
+            <div className="stat">
+              <span className="stat__n">{pool?.ai ?? 0}</span>
+              <span className="stat__l">Chosen by the AI</span>
             </div>
             <div className="stat">
               <span className="stat__n">{pool?.holdout ?? 0}</span>
