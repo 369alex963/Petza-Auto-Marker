@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
 import type { AppCtx } from "../App";
 import { api, type Account, type Provider } from "../api";
+import { DemoNote } from "./DemoNote";
 import { PromptEditor } from "./PromptEditor";
 
 const ACCOUNT_APP: Record<"claude" | "openai", { app: string; site: string; name: string }> = {
@@ -406,6 +407,15 @@ export function Settings({ ctx }: { ctx: AppCtx }) {
   "status": "auto"  (or "reviewed" once approved)
 }`}</pre>
       </section>
+
+      {s?.demo ? (
+        <section className="panel" aria-labelledby="demo" style={{ marginTop: "var(--space-lg)" }}>
+          <h2 className="panel__title" id="demo">
+            Demo data
+          </h2>
+          <DemoNote ctx={ctx} />
+        </section>
+      ) : null}
     </main>
   );
 }

@@ -1,0 +1,77 @@
+{
+  "image": "commons_Diabetisches_Fu_syndrom.jpg",
+  "width": 1920,
+  "height": 1440,
+  "regions": [
+    {
+      "id": "r1",
+      "label": "wound",
+      "points": [
+        [
+          1293.0,
+          242.0
+        ],
+        [
+          1301.6,
+          255.2
+        ],
+        [
+          1303.3,
+          270.5
+        ],
+        [
+          1316.0,
+          282.3
+        ],
+        [
+          1331.5,
+          279.4
+        ],
+        [
+          1345.7,
+          269.2
+        ],
+        [
+          1339.1,
+          254.1
+        ],
+        [
+          1326.7,
+          241.9
+        ],
+        [
+          1309.7,
+          238.2
+        ]
+      ],
+      "confidence": 0.8642,
+      "source": "auto"
+    }
+  ],
+  "model_version": "m-20261110-142433",
+  "created_at": "2026-11-10T13:22:13Z",
+  "status": "auto",
+  "approved_by": null,
+  "confidence": 0.8642,
+  "review": null,
+  "ai": {
+    "ok": true,
+    "via": "ChatGPT account (saved answer)",
+    "runs": 2,
+    "choices": [
+      {
+        "id": 1,
+        "keep": true,
+        "outline": "B",
+        "label": "wound",
+        "reason": "\u05de\u05d5\u05e7\u05d3 \u05db\u05d4\u05d4 \u05e9\u05dc \u05e8\u05e7\u05de\u05d4 \u05e0\u05de\u05e7\u05d9\u05ea; \u05d4\u05e7\u05d5 \u05de\u05e9\u05d0\u05d9\u05e8 \u05d0\u05ea \u05d4\u05e2\u05d5\u05e8 \u05d4\u05de\u05e2\u05d5\u05d1\u05d4 \u05d1\u05d7\u05d5\u05e5.",
+        "agreed": "2/2"
+      }
+    ],
+    "missed": 0,
+    "notes": "\u05d4\u05e2\u05d5\u05e8 \u05d4\u05d9\u05d1\u05e9 \u05d5\u05d4\u05e7\u05d9\u05dc\u05d5\u05e3 \u05de\u05e1\u05d1\u05d9\u05d1 \u05d0\u05d9\u05e0\u05dd \u05d7\u05dc\u05e7 \u05de\u05d4\u05e4\u05e6\u05e2.",
+    "corrected": false,
+    "seconds": 0.1
+  },
+  "quality": "good"
+}

@@ -179,6 +179,7 @@ The UI is in English. It is professional, calm and friendly, with a playful stic
    - filter chips: All, Worth a look, Approved, Not marked;
    - **Mark all photos**, plus **Mark again with the AI** when the AI is on;
    - **Approve all sure ones**: approve in one go every photo with a wound, confidence at or above the threshold, and not blurry. These are stored as `approved_by: "auto"`: never overwritten, but not used for training, because no person checked them;
+   - a **demo note** while the demo data is in use, with a **Remove demo data** button. The repo ships `demo/`: example photos, new photos, their markings and a model trained only on those examples, with no wound data before. The first start (no settings yet) points the app at it. Remove deletes the demo folder, its pool items, every trained model and the caches; prompts and AI settings stay;
    - **Choose photos to approve**: a pick mode where the person ticks any marked photos (or all shown) and approves them together. These count as `approved_by: "person"` and join the training pool;
    - a progress strip with Stop.
 2. **Try one photo:**

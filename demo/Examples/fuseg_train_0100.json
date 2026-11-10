@@ -1,0 +1,1 @@
+{"image": "fuseg_train_0100.png", "width": 512, "height": 512, "status": "reviewed", "regions": [{"id": "r1", "label": "wound", "points": [[174.0, 252.0], [167.0, 251.0], [163.0, 256.0], [165.0, 257.0], [167.0, 263.0], [171.0, 262.0], [174.0, 259.0]], "source": "manual"}]}

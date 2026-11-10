@@ -12,7 +12,7 @@ from fastapi.responses import FileResponse, JSONResponse, Response
 from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel
 
-from . import config, dataset, prompts, reviewer, train
+from . import config, dataset, demo, prompts, reviewer, train
 from .batch import mark_folder, save_result
 from .device import device_info
 from .imageio import list_images, load_image, open_image
@@ -86,7 +86,16 @@ def status():
     return {"device": device_info(), "model": model, "pool": dataset.pool_stats(), "settings": public,
             "rules": {"prompt": prompts.load()["active"], "labels": rules.labels,
                       "review_below_confidence": rules.review_below_confidence},
-            "reviewer": reviewer.connections(s), "job": jobs.snapshot()}
+            "reviewer": reviewer.connections(s), "job": jobs.snapshot(), "demo": demo.active(s)}
+
+
+@app.post("/api/demo/remove")
+def demo_remove():
+    if jobs.snapshot().get("status") == "running":
+        raise HTTPException(409, "Wait for the current job to finish.")
+    with _pred_lock:
+        _predictor["run"] = _predictor["obj"] = None
+    return demo.remove()
 
 
 class SettingsIn(BaseModel):

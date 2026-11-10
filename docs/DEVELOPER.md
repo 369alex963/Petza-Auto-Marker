@@ -16,6 +16,23 @@ Double-click `start.bat`. The first time, it installs everything into `.venv` in
    The **Hardest test photos** on Teach show your outline (dark) next to the app's (pink), so you can see where it still struggles. Any earlier model can be switched back on from the history.
 4. **Editor:** drag points, click the outline to add a point, right-click a point to remove it, press `L` to draw a new area with the point lasso. Press **Approve** (the heart) to save. Approved photos are never overwritten, and they teach the app on the next Teach. **Mark this photo** re-runs the app on just the open photo.
 
+## Demo data
+
+`demo/` (tracked) holds:
+- `Examples/` (50 FUSeg examples);
+- `Photos/` (22 diabetic photos);
+- `Marked JSON/` (their markings);
+- `model/` (the trained run: `model.pt`, `model.onnx`, `meta.json`);
+- `CREDITS.md`.
+
+The demo model started with no wound data (ImageNet encoder only), learned from 42 examples, and scored held-out IoU 0.766.
+
+`petza/demo.py`:
+- `seed()` runs from `python -m petza` only when `data/settings.json` does not exist. It points the folders at `demo/`, imports the examples, and installs the model as the current run. `meta.json` stores holdout ids as file names, because pool ids are hashes of absolute paths; `seed()` maps them back to ids.
+- `remove()` (`POST /api/demo/remove`, the **Remove demo data** button) deletes `demo/`, the pool items sourced from it, every trained model and the caches, and clears the folder settings. Prompts and AI settings stay.
+
+`PETZA_DEMO` overrides the folder, which is useful for tests.
+
 ## AI-guided marking (optional)
 
 The local model draws, the online AI decides (`petza/refine.py`). Per photo:

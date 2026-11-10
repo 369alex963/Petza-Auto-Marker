@@ -13,7 +13,8 @@ MODELS = Path(os.environ.get("PETZA_MODELS", ROOT / "models"))  # bundled pretra
 POOL = DATA / "pool"            # training examples (images + our JSON)
 RUNS = DATA / "models"          # trained models, one folder per run
 CACHE = DATA / "cache"
-TOOLS = ROOT / "tools"          # official AI command-line apps the app downloaded itself
+DEMO = Path(os.environ.get("PETZA_DEMO", ROOT / "demo"))  # demo photos, examples and model (on GitHub)
+TOOLS = ROOT / "tools"         # official AI command-line apps the app downloaded itself
 SETTINGS_FILE = DATA / "settings.json"
 
 # Keep any library cache inside the project, never in the user profile.

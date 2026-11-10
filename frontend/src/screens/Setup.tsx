@@ -2,6 +2,7 @@ import { useEffect, useState } from "react";
 import type { AppCtx } from "../App";
 import { api } from "../api";
 import { Folder } from "../icons";
+import { DemoNote } from "./DemoNote";
 
 type Key = "images_dir" | "examples_dir" | "output_dir";
 
@@ -54,6 +55,7 @@ export function Setup({ ctx }: { ctx: AppCtx }) {
           <p className="page__sub">Where the marked examples and the photos live. Nothing leaves this computer.</p>
         </div>
       </div>
+      <DemoNote ctx={ctx} />
       <div className="cols">
         <form className="panel" onSubmit={save} noValidate>
           {FIELDS.map((f) => (

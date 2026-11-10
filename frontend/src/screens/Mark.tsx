@@ -2,6 +2,7 @@ import { useEffect, useMemo, useState } from "react";
 import { editHash, go, type AppCtx } from "../App";
 import { api, imageUrl, QUALITY_TEXT, type ImageItem } from "../api";
 import { Heart, Smiley, Sparkle } from "../icons";
+import { DemoNote } from "./DemoNote";
 
 type Filter = "all" | "look" | "approved" | "unmarked";
 
@@ -136,6 +137,8 @@ export function Mark({ ctx }: { ctx: AppCtx }) {
           </button>
         </div>
       </div>
+
+      <DemoNote ctx={ctx} />
 
       {noModel ? (
         <div className="note">

@@ -139,6 +139,7 @@ export interface Status {
   reviewer: { claude: Connection[]; openai: Connection[]; groq: Connection[]; ready: boolean; install: { claude: string; codex: string } };
   rules: { prompt: string; labels: string[]; review_below_confidence: number };
   job: Job;
+  demo: boolean;
 }
 
 export interface ImageItem {
@@ -222,6 +223,7 @@ export const api = {
   useRun: (runId: string) => call<Status>("POST", `/api/runs/${encodeURIComponent(runId)}/use`),
   holdout: () => call<{ items: HoldoutItem[] }>("GET", "/api/holdout"),
   approveSure: () => call<{ approved: number }>("POST", "/api/approve-sure"),
+  removeDemo: () => call<{ pool_removed: number }>("POST", "/api/demo/remove"),
   approve: (paths: string[]) => call<{ approved: number }>("POST", "/api/approve", { paths }),
   tryOne: (path: string, save = false) => call<TryResult>("POST", "/api/try", { path, save }),
   accounts: () => call<Record<"claude" | "openai", Account>>("GET", "/api/ai/accounts"),

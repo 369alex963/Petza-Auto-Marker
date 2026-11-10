@@ -21,6 +21,10 @@ def free_port(preferred: int = 8765) -> int:
 def main() -> None:
     import uvicorn
 
+    from . import demo
+
+    if demo.seed():
+        print("\n  First start: the demo photos and the demo model are ready to try.")
     port = free_port(int(os.environ.get("PETZA_PORT", 8765)))
     url = f"http://127.0.0.1:{port}"
     print(f"\n  Wound-Recognizer is running at {url}\n  Keep this window open. Close it to stop the app.\n")
