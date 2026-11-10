@@ -34,6 +34,7 @@ export interface AiChoice {
   label: string;
   reason: string;
   agreed: string;
+  kept_local_edge?: boolean;
 }
 
 export interface AiInfo {
@@ -128,6 +129,7 @@ export interface Status {
     groq_api_key: boolean;
     groq_model: string;
     ai_runs: number;
+    ai_edges: boolean;
   };
   reviewer: { claude: Connection[]; openai: Connection[]; groq: Connection[]; ready: boolean; install: { claude: string; codex: string } };
   rules: { prompt: string; labels: string[]; review_below_confidence: number };
@@ -144,6 +146,7 @@ export interface ImageItem {
   review: Review | null;
   ai: boolean | null;
   quality: Quality | null;
+  approved_by?: "person" | "auto" | null;
   size?: [number, number];
   outline?: Point[][];
 }
@@ -213,6 +216,7 @@ export const api = {
   runs: () => call<{ runs: Run[] }>("GET", "/api/runs"),
   useRun: (runId: string) => call<Status>("POST", `/api/runs/${encodeURIComponent(runId)}/use`),
   holdout: () => call<{ items: HoldoutItem[] }>("GET", "/api/holdout"),
+  approveSure: () => call<{ approved: number }>("POST", "/api/approve-sure"),
   tryOne: (path: string, save = false) => call<TryResult>("POST", "/api/try", { path, save }),
   accounts: () => call<Record<"claude" | "openai", Account>>("GET", "/api/ai/accounts"),
   connect: (provider: "claude" | "openai") => call<Job>("POST", "/api/ai/connect", { provider }),

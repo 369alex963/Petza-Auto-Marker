@@ -32,6 +32,7 @@ from .schema import Region
 MAX_SIDE = 1568      # longest side of what is sent (the providers' sweet spot)
 FIND = 0.25          # regions are searched at this probability, so faint wounds are candidates too
 TIGHT, WIDE = 0.7, 0.3
+SURE_EDGE = 0.75     # tight area / wide area at or above this: the local edge is sharp, keep it
 MISSED = 0.2         # threshold inside a box the AI says holds a missed wound
 MAX_CANDIDATES = 8   # more would crowd the picture; the rest keep the local result
 OPTION_NAMES = {"A": "tight", "B": "normal", "C": "wide"}
@@ -91,6 +92,7 @@ class Candidate:
     label: str
     outlines: dict[str, list[list[list[float]]]]  # option -> polygons (a region may split at a stricter threshold)
     area: float
+    edge: float = 0.0  # tight area / wide area: near 1 means the local model is sure where the edge is
 
     @property
     def default(self) -> tuple[bool, str]:
@@ -136,7 +138,9 @@ def candidates(probs: np.ndarray, classes: list[str], rules: Rules, spacing: flo
         if not any(outlines.values()):
             continue
         cls = int(probs[win][region][:, 1:].mean(0).argmax())
-        found.append(Candidate(0, classes[cls] if cls < len(classes) else "wound", outlines, float(stats[i, cv2.CC_STAT_AREA])))
+        tight, wide = int((region & (fg[win] >= TIGHT)).sum()), int((region & (fg[win] >= WIDE)).sum())
+        found.append(Candidate(0, classes[cls] if cls < len(classes) else "wound", outlines, float(stats[i, cv2.CC_STAT_AREA]),
+                               tight / wide if wide else 0.0))
     found.sort(key=lambda c: -c.area)
     for k, c in enumerate(found):
         c.id = k + 1
@@ -316,6 +320,14 @@ def mark(pred, img: np.ndarray, rules: Rules, s=None, use_ai: bool = False, keep
         result.ai = {"ok": False, "errors": result.errors[-3:], "seconds": round(time.time() - started, 1)}
         return result
     decisions, boxes = vote(answers, asked, pred.classes)
+    for c, d in zip(asked, decisions):
+        # Measured on real diabetic photos (held-out professional markings): the AI's
+        # tighter or wider outline was less exact than the local edge, so by default
+        # the AI decides wound or not and finds missed wounds, and the edge stays local.
+        # With ai_edges on, it may move the edge only where the local edge is unsure.
+        free = getattr(s, "ai_edges", False) and c.edge < SURE_EDGE
+        if d["keep"] and d["outline"] != "B" and not free and c.outlines.get("B"):
+            d["outline"], d["kept_local_edge"] = "B", True
     chosen: list[Region] = []
     for c, d in zip(asked, decisions):
         if d["keep"]:

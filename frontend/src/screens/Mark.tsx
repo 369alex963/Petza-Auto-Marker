@@ -46,6 +46,22 @@ export function Mark({ ctx }: { ctx: AppCtx }) {
     history.replaceState(null, "", f === "all" ? "#/mark" : `#/mark?show=${f}`);
   };
 
+  const sure = (items ?? []).filter((i) => i.status === "auto" && i.regions > 0 && !i.needs_review).length;
+  const [approving, setApproving] = useState(false);
+  const approveSure = async () => {
+    if (!window.confirm(`Approve the ${sure} photos the app is sure about? Their JSON files are kept as final and never overwritten. You can still open and change any of them.`)) return;
+    setApproving(true);
+    try {
+      const r = await api.approveSure();
+      ctx.toast(`${r.approved} photos approved`);
+      setItems((await api.images()).items);
+    } catch (e) {
+      ctx.toast((e as Error).message);
+    } finally {
+      setApproving(false);
+    }
+  };
+
   const busy = ctx.job?.status === "running";
   const noModel = s && !s.model;
 
@@ -62,6 +78,11 @@ export function Mark({ ctx }: { ctx: AppCtx }) {
           {s?.settings.reviewer_enabled && s.reviewer.ready ? (
             <button type="button" className="btn" disabled={busy || !items?.length} onClick={() => void ctx.startJob("review")}>
               <Sparkle /> Mark again with the AI
+            </button>
+          ) : null}
+          {sure > 0 ? (
+            <button type="button" className="btn" disabled={busy || approving} onClick={() => void approveSure()}>
+              <Heart size={16} /> Approve all sure ones ({sure})
             </button>
           ) : null}
           <button
@@ -164,7 +185,7 @@ export function Mark({ ctx }: { ctx: AppCtx }) {
               <span className="thumb__name">{i.name}</span>
               <span className="thumb__meta">
                 {i.status === "reviewed"
-                  ? `${i.regions} ${i.regions === 1 ? "area" : "areas"}, approved`
+                  ? `${i.regions} ${i.regions === 1 ? "area" : "areas"}, ${i.approved_by === "auto" ? "approved automatically" : "approved"}`
                   : i.status === "auto"
                     ? i.regions === 0
                       ? "No wound found, please check"

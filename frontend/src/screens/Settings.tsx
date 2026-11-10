@@ -30,6 +30,7 @@ export function Settings({ ctx }: { ctx: AppCtx }) {
   const [testing, setTesting] = useState(false);
   const [test, setTest] = useState<TestResult | null>(null);
   const [runs, setRuns] = useState(1);
+  const [edges, setEdges] = useState(false);
   const [accounts, setAccounts] = useState<Record<"claude" | "openai", Account> | null>(null);
   const [waiting, setWaiting] = useState(false);
 
@@ -54,7 +55,8 @@ export function Settings({ ctx }: { ctx: AppCtx }) {
     setProvider(s.settings.reviewer_provider);
     setModels({ claude: s.settings.reviewer_model, openai: s.settings.openai_model, groq: s.settings.groq_model });
     setRuns(s.settings.ai_runs || 1);
-  }, [s?.settings.reviewer_enabled, s?.settings.reviewer_provider, s?.settings.reviewer_model, s?.settings.openai_model, s?.settings.groq_model, s?.settings.ai_runs]); // eslint-disable-line react-hooks/exhaustive-deps
+    setEdges(!!s.settings.ai_edges);
+  }, [s?.settings.reviewer_enabled, s?.settings.reviewer_provider, s?.settings.reviewer_model, s?.settings.openai_model, s?.settings.groq_model, s?.settings.ai_runs, s?.settings.ai_edges]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const hasKey = s ? s.settings[KEY_FIELD[provider]] : false;
   const acc = provider !== "groq" ? accounts?.[provider] : undefined;
@@ -91,6 +93,7 @@ export function Settings({ ctx }: { ctx: AppCtx }) {
     const body: Record<string, string | boolean | number> = {
       reviewer_enabled: enabled,
       ai_runs: runs,
+      ai_edges: edges,
       reviewer_provider: provider,
       reviewer_model: models.claude,
       openai_model: models.openai.trim() || "gpt-6-astra",
@@ -148,8 +151,8 @@ export function Settings({ ctx }: { ctx: AppCtx }) {
         <div>
           <h1 className="page__title">Settings</h1>
           <p className="page__sub">
-            The marking is done on this computer by the app's own AI model. An online AI can make it more exact: the local model draws three precise outlines for every
-            area, and the online AI picks the right one by your marking prompt. It is saved with nothing for you to do.
+            The marking is done on this computer by the app's own AI model. An online AI can make it more exact: it decides by your marking prompt which areas are
+            really wound, removes the ones that are not, and points at wounds the app missed, which the app then outlines precisely. It is saved with nothing for you to do.
           </p>
         </div>
       </div>
@@ -158,7 +161,7 @@ export function Settings({ ctx }: { ctx: AppCtx }) {
           <h2 className="panel__title">Online AI that improves the marking</h2>
           <label className="switch">
             <input type="checkbox" checked={enabled} onChange={(e) => setEnabled(e.target.checked)} />
-            Let the AI improve every marking automatically (it picks the best outline by the marking prompt)
+            Let the AI improve every marking automatically (by the marking prompt)
           </label>
 
           <fieldset className="field">
@@ -305,6 +308,18 @@ export function Settings({ ctx }: { ctx: AppCtx }) {
               seconds a photo) and uses that much more of the AI’s quota.
             </span>
           </fieldset>
+
+          <div className="field">
+            <label className="switch">
+              <input type="checkbox" checked={edges} onChange={(e) => setEdges(e.target.checked)} />
+              Also let the AI move the edge (tighter or wider outline)
+            </label>
+            <span className="field__help">
+              Off by default. Measured on real diabetic photos against professional markings, the app's own edge was more exact (overlap 82.0%, against 79.2% when the
+              AI moved it). With this off, the AI still removes areas that are not wound and finds wounds the app missed. With it on, the AI moves the edge only where the
+              app is unsure of it.
+            </span>
+          </div>
 
           <div className="note">
             <p>

@@ -165,7 +165,7 @@ export function TryOne({ ctx, path: initial }: { ctx: AppCtx; path?: string }) {
                     <tr key={c.id}>
                       <td>{c.id}</td>
                       <td>{c.keep ? `Kept as ${c.label}` : "Removed"}</td>
-                      <td>{c.keep ? OUTLINE_NAME[c.outline] : ""}</td>
+                      <td>{c.keep ? `${OUTLINE_NAME[c.outline]}${c.kept_local_edge ? " (app's edge kept)" : ""}` : ""}</td>
                       <td>{c.agreed}</td>
                       <td dir="auto">{c.reason}</td>
                     </tr>

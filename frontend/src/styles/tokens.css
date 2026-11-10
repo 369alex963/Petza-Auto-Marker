@@ -11,7 +11,7 @@
   --color-paper: oklch(95.7% 0.013 82); --color-paper-2: oklch(92.8% 0.021 79); --color-paper-3: oklch(99.4% 0.007 89);
   --color-ink: oklch(21% 0.011 81); --color-ink-2: oklch(30% 0.013 78); --color-muted: oklch(50% 0.017 64);
   --color-rule: oklch(89.7% 0.02 80); --color-white: oklch(99.5% 0.003 82);
-  --color-accent: oklch(56% 0.225 2); --color-accent-deep: oklch(49% 0.205 2); --color-accent-2: oklch(87.6% 0.179 119); --color-slot: oklch(95% 0.021 355); --color-selection: #3269DD; --color-selection-ink: #FFFFFF;
+  --color-accent: oklch(56% 0.225 2); --color-accent-deep: oklch(49% 0.205 2); --color-accent-2: oklch(87.6% 0.179 119); --color-slot: oklch(95% 0.021 355); --color-selection: var(--color-accent-2); --color-selection-ink: var(--color-ink);
   --color-accent-ink: oklch(99.5% 0.003 82); --color-focus: oklch(56% 0.225 2);
   --font-display: "Bowlby One SC", "Arial Black", sans-serif; --font-body: "Sofia Sans", ui-sans-serif, system-ui, sans-serif;
   --font-outlier: "Sofia Sans", ui-sans-serif, system-ui, sans-serif;

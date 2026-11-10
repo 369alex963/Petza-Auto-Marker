@@ -15,6 +15,13 @@ export function Teach({ ctx }: { ctx: AppCtx }) {
   const runId = ctx.status?.model?.run_id ?? "";
 
   useEffect(() => {
+    if (!open) return;
+    const esc = (e: KeyboardEvent) => e.key === "Escape" && setOpen(null);
+    window.addEventListener("keydown", esc);
+    return () => window.removeEventListener("keydown", esc);
+  }, [open]);
+
+  useEffect(() => {
     api
       .runs()
       .then((r) => setRuns(r.runs))

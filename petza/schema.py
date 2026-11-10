@@ -36,6 +36,7 @@ class Marking(BaseModel):
     model_version: str | None = None
     created_at: str = Field(default_factory=now_iso)
     status: Literal["auto", "reviewed"] = "auto"
+    approved_by: Literal["person", "auto"] | None = None  # "auto": approved in one go because the app was sure
     confidence: float | None = None
     review: dict | None = None   # older AI second opinion {ok, problems, summary}
     ai: dict | None = None       # what the online AI chose {via, runs, choices, missed, notes, ...}

@@ -35,6 +35,7 @@ class Settings(BaseModel):
     groq_api_key: str = ""
     groq_model: str = "qwen/qwen3.8-27b"  # Groq's vision model (free plan)
     ai_runs: int = 1                      # 1, 2 or 3 questions per photo (majority vote)
+    ai_edges: bool = False                # let the AI move the edge (tight/wide); measured less exact, so off
 
 
 def load_settings() -> Settings:

@@ -27,9 +27,10 @@ The local model draws, the online AI decides (`petza/refine.py`). Per photo:
    - a numbered A/B/C overlay, zoomed in when the regions are small;
    - the active prompt.
 4. It answers with strict JSON: per region `keep`, `outline`, `label` and `reason`, plus `missed` boxes. A missed box is re-predicted locally at p ≥ 0.2 and outlined.
-5. Settings `ai_runs` sets 1, 2 or 3 questions per photo, decided by majority vote; a tie keeps the local result.
-6. Answers are cached in `data/cache/ai`. Rate limits are waited out. Any failure keeps the local result.
-7. Applied outlines join the training pool as kind `ai`. They are never held out, so the promote gate still scores against human markings only.
+5. By default the edge stays local (B). On real diabetic photos the AI's A/C choice was less exact (IoU 0.792 against 0.820). Setting `ai_edges` allows A/C only where the edge is unsure (tight/wide area < 0.75).
+6. Settings `ai_runs` sets 1, 2 or 3 questions per photo, decided by majority vote; a tie keeps the local result.
+7. Answers are cached in `data/cache/ai`. Rate limits are waited out. Any failure keeps the local result.
+8. Applied outlines join the training pool as kind `ai`. They are never held out, so the promote gate still scores against human markings only.
 
 The same code runs for **Mark all**, **Mark this photo again** and **Try one photo** (`POST /api/try`).
 

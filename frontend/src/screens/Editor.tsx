@@ -329,7 +329,8 @@ export function Editor({ path, ctx }: { path: string; ctx: AppCtx }) {
         else void save(true);
       } else if (e.key === "Escape") {
         if (draft.length) setDraft([]);
-        else setTool("edit");
+        else if (tool === "lasso") setTool("edit");
+        else leave("#/mark"); // close the photo
       } else if (e.key === "Backspace" && tool === "lasso" && draft.length) {
         setDraft((d) => d.slice(0, -1));
       } else if ((e.key === "Delete" || e.key === "Backspace") && selected != null) {

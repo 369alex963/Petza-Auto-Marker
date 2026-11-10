@@ -92,7 +92,16 @@ def settings(tmp_path, monkeypatch):
     return config.Settings(reviewer_enabled=True, ai_runs=1)
 
 
+def test_edges_stay_local_by_default(settings, monkeypatch):
+    monkeypatch.setattr(refine.reviewer, "ask", lambda *a, **k: (answer([(1, True, "A"), (2, False, "C")]), "Fake", []))
+    r = refine.mark(FakePredictor(), np.full((H, W, 3), 180, np.uint8), Rules(), settings, use_ai=True)
+    big = refine.candidates(probs_map(), ["wound"], Rules(), None)[0]
+    assert len(r.regions) == 1 and abs(area([r.regions[0].points]) - area(big.outlines["B"])) < 1  # A was asked, B kept
+    assert r.ai["choices"][0]["kept_local_edge"]
+
+
 def test_mark_applies_choices_and_finds_missed(settings, monkeypatch):
+    settings.ai_edges = True
     img = np.full((H, W, 3), 180, np.uint8)
     asked = []
 

@@ -91,3 +91,13 @@ def test_import_teach_mark(env):
         time.sleep(0.5)
     assert job["status"] == "done", job
     assert c.get(f"/api/marking?path={one}").json()["marking"]["regions"]
+
+    # Approve all sure ones: sure markings become final, never training examples.
+    items = c.get("/api/images").json()["items"]
+    sure = [i for i in items if i["status"] == "auto" and i["regions"] and not i["needs_review"]]
+    pool_before = c.get("/api/status").json()["pool"]["total"]
+    assert c.post("/api/approve-sure").json()["approved"] == len(sure) > 0
+    after = {i["path"]: i for i in c.get("/api/images").json()["items"]}
+    assert all(after[i["path"]]["status"] == "reviewed" and after[i["path"]]["approved_by"] == "auto" for i in sure)
+    assert c.get("/api/status").json()["pool"]["total"] == pool_before
+    assert c.post("/api/approve-sure").json()["approved"] == 0

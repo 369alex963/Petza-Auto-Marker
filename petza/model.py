@@ -37,7 +37,10 @@ def config_for(device: str) -> ModelConfig:
     import torch
 
     gb = torch.cuda.get_device_properties(0).total_memory / 2**30
+    free = (torch.cuda.mem_get_info()[0] + torch.cuda.memory_reserved()) / 2**30  # other apps may hold part of the card
     batch = 6 if gb >= 15 else 4 if gb >= 11 else 2
+    if free < 5.5:  # 768 px would spill into shared memory and run 50x slower
+        return ModelConfig(**{**GPU_CONFIG.to_dict(), "size": 512, "batch": 2 if free < 3.5 else 4})
     return ModelConfig(**{**GPU_CONFIG.to_dict(), "batch": batch})
 
 

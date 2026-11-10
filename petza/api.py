@@ -102,6 +102,7 @@ class SettingsIn(BaseModel):
     groq_api_key: str | None = None
     groq_model: str | None = None
     ai_runs: int | None = None
+    ai_edges: bool | None = None
 
 
 @app.post("/api/settings")
@@ -166,7 +167,7 @@ def _summary(img: Path, out: Path | None, threshold: float) -> dict:
         try:
             m = read_marking(jp)
             item.update(status=m.status, confidence=m.confidence, regions=len(m.regions), review=m.review,
-                        ai=(m.ai or {}).get("ok"), quality=m.quality,
+                        ai=(m.ai or {}).get("ok"), quality=m.quality, approved_by=m.approved_by,
                         size=[m.width, m.height], outline=[r.points[:: max(1, len(r.points) // 60)] for r in m.regions])
             item["needs_review"] = m.status != "reviewed" and (
                 not m.regions or (m.confidence or 0) < threshold or m.quality == "blurry"
@@ -224,11 +225,37 @@ class SaveIn(BaseModel):
 @app.put("/api/marking")
 def save_marking(body: SaveIn):
     p = check_path(body.path)
-    m = body.marking.model_copy(update={"status": "reviewed", "image": p.name})
+    m = body.marking.model_copy(update={"status": "reviewed", "approved_by": "person", "image": p.name})
     jp = marking_path_for(p, output_dir(settings()))
     write_marking(m, jp)
     dataset.add_to_pool(p, m, "reviewed")
     return {"ok": True, "json_path": str(jp), "pool": dataset.pool_stats()}
+
+
+@app.post("/api/approve-sure")
+def approve_sure():
+    """Approve, in one go, every marking the app is sure of: it has a wound, its
+    confidence is at or above the threshold, and the photo is not blurry. These
+    are kept as the final JSON (never overwritten) but are not training examples,
+    because no person checked them."""
+    s = settings()
+    if not s.images_dir:
+        raise HTTPException(400, "Choose the images folder first.")
+    if jobs.snapshot().get("status") == "running":
+        raise HTTPException(409, "Wait for the current job to finish.")
+    out = output_dir(s)
+    threshold = prompts.active_rules().review_below_confidence
+    approved = 0
+    for img in list_images(s.images_dir, skip=out):
+        jp = marking_path_for(img, out)
+        try:
+            m = read_marking(jp)
+        except Exception:
+            continue
+        if m.status == "auto" and m.regions and (m.confidence or 0) >= threshold and m.quality != "blurry"                 and not (m.review is not None and not m.review.get("ok", True)):
+            write_marking(m.model_copy(update={"status": "reviewed", "approved_by": "auto"}), jp)
+            approved += 1
+    return {"approved": approved}
 
 
 # ---------- jobs ----------
